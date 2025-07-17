@@ -3,7 +3,7 @@
 /** @noinspection DuplicatedCode */
 /** @noinspection PhpUnused */
 
-namespace Concrete\Package\use KatalysisAiChatBot\Controller\Dialog\Chats;
+namespace Concrete\Package\KatalysisAiChatBot\Controller\Dialog\Chats;
 
 use Concrete\Controller\Dialog\Search\AdvancedSearch as AdvancedSearchController;
 use Concrete\Core\Support\Facade\Url;
