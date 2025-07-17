@@ -1,0 +1,7 @@
+
+{
+    "name": "katalysis/katalysis_ai_chat_bot",
+    "type": "concrete5-package",
+    "require": {
+    }
+}
