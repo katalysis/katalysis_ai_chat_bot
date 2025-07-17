@@ -39,12 +39,7 @@ class RagBuildIndex {
             $content = $r->getPageIndexContent();
             
             // Skip pages with empty content
-            if (empty($content) || !is_string($content)) {
-                continue;
-            }
-            
-            // Skip pages that are too short (likely system pages)
-            if (strlen($content) < 50) {
+            if (!$this->isValidContent($content)) {
                 continue;
             }
 
@@ -61,21 +56,15 @@ class RagBuildIndex {
 
     public function addDocuments(array $pages): void
     {
-        $embeddingProvider = new OpenAIEmbeddingsProvider(
-            key: Config::get('katalysis.ai.open_ai_key'),
-            model: 'text-embedding-3-small'
-        );
-        $vectorStore = new FileVectorStore(
-            directory: DIR_APPLICATION . '/files/neuron',
-            topK: 4
-        );
+        $embeddingProvider = $this->getEmbeddingProvider();
+        $vectorStore = $this->getVectorStore();
         
         $processedCount = 0;
         $skippedCount = 0;
         
         foreach ($pages as $page) {
             // Validate content before processing
-            if (empty($page['content']) || !is_string($page['content'])) {
+            if (!$this->isValidContent($page['content'])) {
                 $skippedCount++;
                 continue;
             }
@@ -106,16 +95,40 @@ class RagBuildIndex {
 
     public function getRelevantDocuments(string $query, int $topK = 12): array
     {
-        $embeddingProvider = new OpenAIEmbeddingsProvider(
-            key: Config::get('katalysis.ai.open_ai_key'),
-            model: 'text-embedding-3-small'
-        );
-        $vectorStore = new FileVectorStore(
-            directory: DIR_APPLICATION . '/files/neuron',
-            topK: $topK
-        );
+        $embeddingProvider = $this->getEmbeddingProvider();
+        $vectorStore = $this->getVectorStore($topK);
         $queryEmbedding = $embeddingProvider->embedText($query);
         
         return $vectorStore->similaritySearch($queryEmbedding);
+    }
+
+    /**
+     * Get the OpenAI embeddings provider instance
+     */
+    private function getEmbeddingProvider(): OpenAIEmbeddingsProvider
+    {
+        return new OpenAIEmbeddingsProvider(
+            key: Config::get('katalysis.ai.open_ai_key'),
+            model: 'text-embedding-3-small'
+        );
+    }
+
+    /**
+     * Get the file vector store instance
+     */
+    private function getVectorStore(int $topK = 4): FileVectorStore
+    {
+        return new FileVectorStore(
+            directory: DIR_APPLICATION . '/files/neuron',
+            topK: $topK
+        );
+    }
+
+    /**
+     * Validate if content is suitable for processing
+     */
+    private function isValidContent($content): bool
+    {
+        return is_string($content) && !empty($content) && strlen($content) >= 50;
     }
 }

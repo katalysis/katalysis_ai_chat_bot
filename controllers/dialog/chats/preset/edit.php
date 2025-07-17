@@ -11,7 +11,7 @@
 /** @noinspection DuplicatedCode */
 /** @noinspection PhpUnused */
 
-namespace Concrete\Package\use KatalysisAiChatBot\Controller\Dialog\Chats\Preset;
+namespace Concrete\Package\KatalysisAiChatBot\Controller\Dialog\Chats\Preset;
 
 use KatalysisAiChatBot\Entity\Search\SavedChatsSearch;
 use Concrete\Core\Permission\Key\Key;

@@ -11,6 +11,17 @@ defined('C5_EXECUTE') or die('Access Denied.');
         <div class="row mb-5 justify-content-between">
 
             <div class="col-12 col-md-8 col-lg-6">
+                <div class="alert alert-primary mb-5">
+                    <h5><i class="fas fa-robot"></i> <?php echo t('AI Chat Bot System Overview'); ?></h5>
+                    <p class="mb-3"><?php echo t('This system provides an intelligent AI chatbot that can understand your website content and provide contextual responses. Here\'s how it works:'); ?></p>
+                    <ul class="mb-0">
+                        <li><strong><?php echo t('Content Indexing'); ?></strong> - <?php echo t('Your website pages are automatically indexed, including key attributes like page titles, page types, URLs, and content.'); ?></li>
+                        <li><strong><?php echo t('Context Awareness'); ?></strong> - <?php echo t('The AI uses this indexed information to understand what page the user is on and provide relevant responses.'); ?></li>
+                        <li><strong><?php echo t('Dynamic Responses'); ?></strong> - <?php echo t('AI generates personalized welcome messages and intelligent responses based on the user\'s context and your content.'); ?></li>
+                        <li><strong><?php echo t('Smart Link Selection'); ?></strong> - <?php echo t('The system intelligently selects the most relevant links to include with responses, helping users find related information.'); ?></li>
+                    </ul>
+                </div>
+
                 <fieldset class="mb-5">
                     <legend><?php echo t('Chat Bot Settings'); ?></legend>
                     <div class="row">
@@ -18,7 +29,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             <div class="form-group">
                                 <?php echo $form->label(
                                     "instructions",
-                                    t("Instructions"),
+                                    t("Main AI Instructions"),
                                     [
                                         "class" => "control-label"
                                     ]
@@ -37,129 +48,140 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         </div>
                     </div>
                     <div class="alert alert-info">
-                        <p>The instructions you enter here will be used to guide the AI when it is answering questions.
-                            You can use the following placeholders:</p>
+                        <h6><?php echo t('Main AI Instructions'); ?></h6>
+                        <p><?php echo t('These instructions define how the AI responds to user questions. They guide the AI\'s personality, tone, and approach to providing information.'); ?></p>
+                        
+                        <h6><?php echo t('Available Context Placeholders'); ?></h6>
+                        <p><?php echo t('You can use these placeholders to make responses context-aware:'); ?></p>
                         <ul>
-                            <li><code>{page_type}</code> - The page type of the page the user is on</li>
-                            <li><code>{page_title}</code> - The title of the page the user is on</li>
-                            <li><code>{page_url}</code> - The URL of the page the user is on</li>
+                            <li><code>{page_type}</code> - <?php echo t('The page type of the current page (e.g., location, service, blog, page)'); ?></li>
+                            <li><code>{page_title}</code> - <?php echo t('The title of the current page'); ?></li>
+                            <li><code>{page_url}</code> - <?php echo t('The URL of the current page'); ?></li>
                         </ul>
 
-                        <p>For example, if you want the AI to always include a call to action, you can use the following
-                            instruction:</p>
-
+                        <h6><?php echo t('Example Instructions'); ?></h6>
                         <div class="alert alert-success">
-                            <h6>Example Instructions:</h6>
-                            <ul>
-                                <li><strong>Location-specific responses:</strong>
-                                    <code>If the page type is "location", mention that we are based in your local area and can provide on-site services. Always include local contact information.</code>
-                                </li>
-                                <li><strong>Service page responses:</strong>
-                                    <code>If the page type is "service", focus on the specific service mentioned in {page_title} and provide detailed information about our expertise in this area.</code>
-                                </li>
-                                <li><strong>General responses:</strong>
-                                    <code>Always be helpful and professional. If the user is on a {page_type} page, tailor your response to be relevant to that type of content.</code>
-                                </li>
-                            </ul>
+                            <p><strong><?php echo t('Location-specific responses:'); ?></strong></p>
+                            <p><code><?php echo t('If the page type is "location", mention that we are based in your local area and can provide on-site services. Always include local contact information.'); ?></code></p>
+                            
+                            <p><strong><?php echo t('Service page responses:'); ?></strong></p>
+                            <p><code><?php echo t('If the page type is "service", focus on the specific service mentioned in {page_title} and provide detailed information about our expertise in this area.'); ?></code></p>
                         </div>
                     </div>
-                </fieldset>
-
-
-
-                <fieldset class="mb-5">
-                    <legend><?php echo t('Available Page Types'); ?></legend>
-                    <div class="row">
-                        <div class="col">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th><?php echo t('ID'); ?></th>
-                                            <th><?php echo t('Handle'); ?></th>
-                                            <th><?php echo t('Name'); ?></th>
-                                            <th><?php echo t('Type'); ?></th>
-                                            <th><?php echo t('Frequently Added'); ?></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php if (!empty($pageTypes)): ?>
-                                            <?php foreach ($pageTypes as $pageType): ?>
-                                                <tr>
-                                                    <td><?php echo h($pageType['id']); ?></td>
-                                                    <td><code><?php echo h($pageType['handle']); ?></code></td>
-                                                    <td><?php echo h($pageType['name']); ?></td>
-                                                    <td>
-                                                        <?php if ($pageType['isInternal']): ?>
-                                                            <span class="badge bg-secondary"><?php echo t('Internal'); ?></span>
-                                                        <?php else: ?>
-                                                            <span class="badge bg-primary"><?php echo t('Public'); ?></span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if ($pageType['isFrequentlyAdded']): ?>
-                                                            <span class="badge bg-success"><?php echo t('Yes'); ?></span>
-                                                        <?php else: ?>
-                                                            <span class="badge bg-warning"><?php echo t('No'); ?></span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <tr>
-                                                <td colspan="5" class="text-center text-muted">
-                                                    <?php echo t('No page types found.'); ?>
-                                                </td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="mt-3">
-                                <small class="text-muted">
-                                    <?php echo t('This list shows all available page types in your Concrete CMS installation. You can use these page type handles in your RAG system configuration.'); ?>
-                                </small>
-                            </div>
-                        </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restoreDefaultInstructions()">
+                            <i class="fas fa-undo"></i> <?php echo t('Restore Default Instructions'); ?>
+                        </button>
                     </div>
                 </fieldset>
 
                 <fieldset class="mb-5">
-                    <legend><?php echo t('Page Type Response Tracking'); ?></legend>
+                    <legend><?php echo t('Welcome Message Prompt'); ?></legend>
                     <div class="row">
                         <div class="col">
-                            <div class="alert alert-info">
-                                <h6><?php echo t('How Page Type Tracking Works'); ?></h6>
-                                <p><?php echo t('The AI system now tracks which page types are used to generate responses. This includes:'); ?>
-                                </p>
-                                <ul>
-                                    <li><strong><?php echo t('Current Page Type'); ?></strong> - The page type where the
-                                        user is chatting from</li>
-                                    <li><strong><?php echo t('Indexed Page Types'); ?></strong> - Page types from the
-                                        RAG system\'s retrieved documents</li>
-                                    <li><strong><?php echo t('Response Context'); ?></strong> - Information about how
-                                        the AI used this context</li>
-                                </ul>
+                            <div class="form-group">
+                                <?php echo $form->label(
+                                    "welcome_message_prompt",
+                                    t("Welcome Message Prompt"),
+                                    [
+                                        "class" => "control-label"
+                                    ]
+                                ); ?>
 
-                                <h6><?php echo t('Response Data Structure'); ?></h6>
-                                <pre><code>{
-  "content": "AI response text",
-  "metadata": [...],
-  "page_types_used": ["location", "service", "blog"],
-  "current_page_type": "location",
-  "context_info": {
-    "current_page_title": "Harpenden Office",
-    "current_page_url": "https://example.com/locations/harpenden",
-    "total_documents_retrieved": 8,
-    "page_types_from_documents": ["location", "service", "blog"]
-  }
-}</code></pre>
-
-
+                                <?php echo $form->textarea(
+                                    "welcome_message_prompt",
+                                    $welcomeMessagePrompt,
+                                    [
+                                        "class" => "form-control",
+                                        "max-length" => "10000",
+                                        "style" => "field-sizing: content;",
+                                        "rows" => "12"
+                                    ]
+                                ); ?>
                             </div>
                         </div>
                     </div>
+                    <div class="alert alert-info">
+                        <h6><?php echo t('Welcome Message Generation'); ?></h6>
+                        <p><?php echo t('This prompt controls how the AI generates personalized welcome messages when users first visit the chat. The AI uses this prompt along with current context to create dynamic, relevant greetings.'); ?></p>
+                        
+                        <h6><?php echo t('Context Placeholders'); ?></h6>
+                        <p><?php echo t('Use these placeholders to include dynamic information:'); ?></p>
+                        <ul>
+                            <li><code>{time_of_day}</code> - <?php echo t('Automatically replaced with "morning", "afternoon", or "evening" based on current time'); ?></li>
+                            <li><code>{page_title}</code> - <?php echo t('The title of the page the user is currently viewing'); ?></li>
+                            <li><code>{page_url}</code> - <?php echo t('The URL of the current page'); ?></li>
+                        </ul>
+
+                        <h6><?php echo t('Example Usage'); ?></h6>
+                        <p><code><?php echo t('Good {time_of_day}! Welcome to our {page_title} page. How can we help you today?'); ?></code></p>
+                        <p><small class="text-muted"><?php echo t('This would generate: "Good morning! Welcome to our Legal Services page. How can we help you today?"'); ?></small></p>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restoreDefaultWelcomePrompt()">
+                            <i class="fas fa-undo"></i> <?php echo t('Restore Default Prompt'); ?>
+                        </button>
+                    </div>
                 </fieldset>
+
+                <fieldset class="mb-5">
+                    <legend><?php echo t('AI Link Selection Rules'); ?></legend>
+                    <div class="row">
+                        <div class="col">
+                            <div class="form-group">
+                                <?php echo $form->label(
+                                    "link_selection_rules",
+                                    t("Link Selection Rules"),
+                                    [
+                                        "class" => "control-label"
+                                    ]
+                                ); ?>
+
+                                <?php echo $form->textarea(
+                                    "link_selection_rules",
+                                    $linkSelectionRules,
+                                    [
+                                        "class" => "form-control",
+                                        "max-length" => "10000",
+                                        "style" => "field-sizing: content;",
+                                        "rows" => "15"
+                                    ]
+                                ); ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <h6><?php echo t('Intelligent Link Selection'); ?></h6>
+                        <p><?php echo t('These rules guide the AI when selecting which links to include with responses. Instead of showing all available links, the AI intelligently chooses the most relevant ones based on the user\'s question and context.'); ?></p>
+                        
+                        <h6><?php echo t('How It Works'); ?></h6>
+                        <ul>
+                            <li><?php echo t('The system searches your indexed content for relevant documents'); ?></li>
+                            <li><?php echo t('The AI analyzes the user\'s question and available documents'); ?></li>
+                            <li><?php echo t('Using these rules, the AI selects 1-3 most relevant links'); ?></li>
+                            <li><?php echo t('Links are displayed as "More Information" buttons below responses'); ?></li>
+                        </ul>
+
+                        <h6><?php echo t('Page Type Context'); ?></h6>
+                        <p><?php echo t('Available page types in your system include:'); ?> 
+                        <?php 
+                        $pageTypeNames = array_map(function($pt) { return $pt['name']; }, $pageTypes);
+                        echo implode(', ', array_slice($pageTypeNames, 0, 5));
+                        if (count($pageTypeNames) > 5) {
+                            echo ' and ' . (count($pageTypeNames) - 5) . ' more';
+                        }
+                        ?>.</p>
+                        
+                        <p><small class="text-muted"><?php echo t('You can reference specific page types in your rules to control link selection behavior.'); ?></small></p>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restoreDefaultLinkRules()">
+                            <i class="fas fa-undo"></i> <?php echo t('Restore Default Rules'); ?>
+                        </button>
+                    </div>
+                </fieldset>
+
+                
             </div>
 
             <div class="col-12 col-md-8 col-lg-5" style="max-width:500px;">
@@ -170,19 +192,22 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             opacity: 0;
                             transform: scale(0.8) translateY(10px);
                         }
+
                         50% {
                             opacity: 1;
                             transform: scale(1.05) translateY(-2px);
                         }
+
                         100% {
                             opacity: 1;
                             transform: scale(1) translateY(0);
                         }
                     }
-                    
+
                     .welcome-animate {
                         animation: welcomeBounce 0.6s ease-out forwards;
                     }
+
                 </style>
                 <script>
                     function renderMarkdown(markdown) {
@@ -209,7 +234,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     function generateWelcomeMessage() {
                         const now = new Date();
                         const hour = now.getHours();
-                        
+
                         let timeGreeting = '';
                         if (hour < 12) {
                             timeGreeting = 'Good morning';
@@ -218,7 +243,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         } else {
                             timeGreeting = 'Good evening';
                         }
-                        
+
                         // Get page information if available
                         let pageInfo = '';
                         try {
@@ -232,7 +257,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         } catch (e) {
                             pageInfo = ', welcome to our website';
                         }
-                        
+
                         return `${timeGreeting}${pageInfo}. How can we help you today?`;
                     }
 
@@ -240,40 +265,34 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     function generateAIWelcomeMessage() {
                         const now = new Date();
                         const hour = now.getHours();
-                        
+
                         // Get page information - use debug context if available, otherwise use actual page info
                         let pageTitle = document.title || '';
                         let pageUrl = window.location.href;
                         let pageType = '';
-                        
+
                         // Use debug context if available and debug mode is enabled
                         if (window.katalysisAIDebugMode) {
                             const debugPageTitle = document.getElementById('debug_page_title')?.value || '';
                             const debugPageType = document.getElementById('debug_page_type')?.value || '';
                             const debugPageUrl = document.getElementById('debug_page_url')?.value || '';
-                            
+
                             if (debugPageTitle) pageTitle = debugPageTitle;
                             if (debugPageType) pageType = debugPageType;
                             if (debugPageUrl) pageUrl = debugPageUrl;
                         }
+
+                        // Get the configurable welcome message prompt
+                        let welcomePrompt = `<?php echo addslashes($welcomeMessagePrompt); ?>`;
                         
-                        // Create a prompt for the AI to generate a welcome message
-                        const welcomePrompt = `Generate a short, friendly welcome message for a legal services website. 
+                        // Replace placeholders with actual values
+                        welcomePrompt = welcomePrompt.replace(/{time_of_day}/g, hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening');
+                        welcomePrompt = welcomePrompt.replace(/{page_title}/g, pageTitle);
+                        welcomePrompt = welcomePrompt.replace(/{page_url}/g, pageUrl);
                         
-                        Context:
-                        - Time of day: ${hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'}
-                        - Current page: ${pageTitle}
-                        - Page URL: ${pageUrl}
-                        
-                        Requirements:
-                        - Include time-based greeting (Good morning/afternoon/evening)
-                        - Keep it very brief (1 sentence maximum)
-                        - Be welcoming, appreciative and professional
-                        - End with "How can we help?"
-                        - Maximum 15-20 words total
-                        
-                        Generate only the welcome message text, no additional formatting.`;
-                        
+                        // Append essential formatting instructions
+                        welcomePrompt += `<?php echo addslashes($essentialWelcomeMessageInstructions); ?>`;
+
                         // Prepare request data with debug context if enabled
                         let requestData = {
                             message: welcomePrompt,
@@ -285,7 +304,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             const debugPageTitle = document.getElementById('debug_page_title')?.value || '';
                             const debugPageType = document.getElementById('debug_page_type')?.value || '';
                             const debugPageUrl = document.getElementById('debug_page_url')?.value || '';
-                            
+
                             if (debugPageTitle || debugPageType || debugPageUrl) {
                                 requestData.debug_context = {
                                     page_title: debugPageTitle,
@@ -295,7 +314,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 console.log('Adding debug context to welcome message request:', requestData.debug_context);
                             }
                         }
-                        
+
                         // Use the existing AI system to generate the welcome message
                         $.ajax({
                             type: "POST",
@@ -307,19 +326,19 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             },
                             success: function (data) {
                                 console.log('AI Welcome Response:', data);
-                                
+
                                 let welcomeText = '';
-                                
+
                                 if (typeof data === 'object' && data.content) {
                                     welcomeText = data.content;
                                 } else if (typeof data === 'string') {
                                     welcomeText = data;
                                 }
-                                
+
                                 // Show and animate the welcome response
                                 const welcomeResponse = document.getElementById('welcome-response');
                                 const welcomeElement = document.getElementById('welcome-message');
-                                
+
                                 if (welcomeResponse && welcomeElement) {
                                     // Set the message text
                                     if (welcomeText && welcomeText.trim()) {
@@ -328,15 +347,15 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                         // If AI response is empty, show fallback
                                         welcomeElement.textContent = 'Hi, How can we help today?';
                                     }
-                                    
+
                                     // Show the response div
                                     welcomeResponse.style.display = 'flex';
-                                    
+
                                     // Add animation class
                                     welcomeResponse.classList.add('welcome-animate');
-                                    
+
                                     // Remove animation class after animation completes
-                                    setTimeout(function() {
+                                    setTimeout(function () {
                                         welcomeResponse.classList.remove('welcome-animate');
                                     }, 600);
                                 }
@@ -346,18 +365,18 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 // Show fallback with animation
                                 const welcomeResponse = document.getElementById('welcome-response');
                                 const welcomeElement = document.getElementById('welcome-message');
-                                
+
                                 if (welcomeResponse && welcomeElement) {
                                     welcomeElement.textContent = 'Hi, How can we help today?';
-                                    
+
                                     // Show the response div
                                     welcomeResponse.style.display = 'flex';
-                                    
+
                                     // Add animation class
                                     welcomeResponse.classList.add('welcome-animate');
-                                    
+
                                     // Remove animation class after animation completes
-                                    setTimeout(function() {
+                                    setTimeout(function () {
                                         welcomeResponse.classList.remove('welcome-animate');
                                     }, 600);
                                 }
@@ -513,11 +532,11 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     $(document).ready(function () {
                         console.log('jQuery ready - loading chat history...');
                         loadChatHistory();
-                        
+
                         // Generate AI welcome message only once
                         if (!welcomeMessageGenerated) {
                             welcomeMessageGenerated = true;
-                            setTimeout(function() {
+                            setTimeout(function () {
                                 generateAIWelcomeMessage();
                             }, 500); // Small delay to ensure everything is loaded
                         }
@@ -527,11 +546,11 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     document.addEventListener('DOMContentLoaded', function () {
                         console.log('DOM loaded - loading chat history...');
                         loadChatHistory();
-                        
+
                         // Generate AI welcome message only once
                         if (!welcomeMessageGenerated) {
                             welcomeMessageGenerated = true;
-                            setTimeout(function() {
+                            setTimeout(function () {
                                 generateAIWelcomeMessage();
                             }, 500); // Small delay to ensure everything is loaded
                         }
@@ -564,7 +583,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             const debugPageTitle = document.getElementById('debug_page_title')?.value || '';
                             const debugPageType = document.getElementById('debug_page_type')?.value || '';
                             const debugPageUrl = document.getElementById('debug_page_url')?.value || '';
-                            
+
                             if (debugPageTitle || debugPageType || debugPageUrl) {
                                 requestData.debug_context = {
                                     page_title: debugPageTitle,
@@ -658,7 +677,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             const debugPageTitle = document.getElementById('debug_page_title')?.value || '';
                             const debugPageType = document.getElementById('debug_page_type')?.value || '';
                             const debugPageUrl = document.getElementById('debug_page_url')?.value || '';
-                            
+
                             if (debugPageTitle || debugPageType || debugPageUrl) {
                                 requestData.debug_context = {
                                     page_title: debugPageTitle,
@@ -792,12 +811,12 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         <div class="card-body">
                             <div id="chat">
                                 <div class="divider d-flex align-items-center mb-4">
-                                    <p class="text-center mx-3 mb-0" style="color: #a2aab7;">Today</p>
+                                    <p class="text-center mx-3 mb-0 color-muted">Today</p>
                                 </div>
                                 <div class="ai-response" id="welcome-response" style="display: none;">
                                     <img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp"
                                         alt="Katalysis Bot">
-                                    <div id="welcome-message" style="font-weight: bold;">Generating welcome message...</div>
+                                    <div id="welcome-message" class="font-weight-bold">Generating welcome message...</div>
                                 </div>
                             </div>
                         </div>
@@ -904,28 +923,131 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         </div>
                     </div>
 
-                    <div class="form-group mb-4">
-                        <div class="alert alert-info">
-                            <h6><?php echo t('AI-Powered Link Selection'); ?></h6>
-                            <p><?php echo t('The system now uses AI to intelligently select the most relevant links for each user question. Instead of rigid scoring algorithms, the AI analyzes the user\'s question context and chooses links that would be most helpful.'); ?></p>
-                            <ul>
-                                <li><strong><?php echo t('Intelligent Selection'); ?></strong> - AI considers the user's question context when choosing links</li>
-                                <li><strong><?php echo t('Contextual Relevance'); ?></strong> - Links are selected based on how well they address the specific user need</li>
-                                <li><strong><?php echo t('Quality Control'); ?></strong> - Only documents with reasonable relevance scores (≥0.3) are considered</li>
-                                <li><strong><?php echo t('Fallback Protection'); ?></strong> - If AI selection fails, falls back to top-scoring documents</li>
-                            </ul>
-                        </div>
-                    </div>
+                    <script>
+                        window.katalysisAIDebugMode = <?php echo $debugMode ? 'true' : 'false'; ?>;
+                        
+                        // Default instructions and link selection rules
+                        const defaultInstructions = `<?php echo addslashes($defaultInstructions); ?>`;
+                        const defaultLinkRules = `<?php echo addslashes($defaultLinkSelectionRules); ?>`;
+                        const defaultWelcomePrompt = `<?php echo addslashes($defaultWelcomeMessagePrompt); ?>`;
+                        
+                        // Function to restore default instructions
+                        function restoreDefaultInstructions() {
+                            if (confirm('<?php echo t('Are you sure you want to restore the default instructions? This will replace your current instructions.'); ?>')) {
+                                document.getElementById('instructions').value = defaultInstructions;
+                                updateInstructionsModifiedStatus();
+                            }
+                        }
+                        
+                        // Function to restore default link selection rules
+                        function restoreDefaultLinkRules() {
+                            if (confirm('<?php echo t('Are you sure you want to restore the default link selection rules? This will replace your current rules.'); ?>')) {
+                                document.getElementById('link_selection_rules').value = defaultLinkRules;
+                                updateRulesModifiedStatus();
+                            }
+                        }
 
-                    <script>window.katalysisAIDebugMode = <?php echo $debugMode ? 'true' : 'false'; ?>;</script>
+                        // Function to restore default welcome prompt
+                        function restoreDefaultWelcomePrompt() {
+                            if (confirm('<?php echo t('Are you sure you want to restore the default welcome message prompt? This will replace your current prompt.'); ?>')) {
+                                document.getElementById('welcome_message_prompt').value = defaultWelcomePrompt;
+                                updateWelcomePromptModifiedStatus();
+                            }
+                        }
+                        
+                        // Function to check if instructions have been modified from default
+                        function updateInstructionsModifiedStatus() {
+                            const currentInstructions = document.getElementById('instructions').value;
+                            const isModified = currentInstructions.trim() !== defaultInstructions.trim();
+                            
+                            const restoreButton = document.querySelector('button[onclick="restoreDefaultInstructions()"]');
+                            if (restoreButton) {
+                                if (isModified) {
+                                    restoreButton.classList.remove('btn-outline-secondary');
+                                    restoreButton.classList.add('btn-warning');
+                                    restoreButton.disabled = false;
+                                    restoreButton.innerHTML = '<i class="fas fa-undo"></i> <?php echo t('Restore Default Instructions'); ?> <span class="badge bg-warning text-dark">Modified</span>';
+                                } else {
+                                    restoreButton.classList.remove('btn-warning');
+                                    restoreButton.classList.add('btn-outline-secondary');
+                                    restoreButton.disabled = true;
+                                    restoreButton.innerHTML = '<i class="fas fa-undo"></i> <?php echo t('Restore Default Instructions'); ?>';
+                                }
+                            }
+                        }
+                        
+                        // Function to check if rules have been modified from default
+                        function updateRulesModifiedStatus() {
+                            const currentRules = document.getElementById('link_selection_rules').value;
+                            const isModified = currentRules.trim() !== defaultLinkRules.trim();
+                            
+                            const restoreButton = document.querySelector('button[onclick="restoreDefaultLinkRules()"]');
+                            if (restoreButton) {
+                                if (isModified) {
+                                    restoreButton.classList.remove('btn-outline-secondary');
+                                    restoreButton.classList.add('btn-warning');
+                                    restoreButton.disabled = false;
+                                    restoreButton.innerHTML = '<i class="fas fa-undo"></i> <?php echo t('Restore Default Rules'); ?> <span class="badge bg-warning text-dark">Modified</span>';
+                                } else {
+                                    restoreButton.classList.remove('btn-warning');
+                                    restoreButton.classList.add('btn-outline-secondary');
+                                    restoreButton.disabled = true;
+                                    restoreButton.innerHTML = '<i class="fas fa-undo"></i> <?php echo t('Restore Default Rules'); ?>';
+                                }
+                            }
+                        }
+
+                        // Function to check if welcome prompt has been modified from default
+                        function updateWelcomePromptModifiedStatus() {
+                            const currentPrompt = document.getElementById('welcome_message_prompt').value;
+                            const isModified = currentPrompt.trim() !== defaultWelcomePrompt.trim();
+
+                            const restoreButton = document.querySelector('button[onclick="restoreDefaultWelcomePrompt()"]');
+                            if (restoreButton) {
+                                if (isModified) {
+                                    restoreButton.classList.remove('btn-outline-secondary');
+                                    restoreButton.classList.add('btn-warning');
+                                    restoreButton.disabled = false;
+                                    restoreButton.innerHTML = '<i class="fas fa-undo"></i> <?php echo t('Restore Default Prompt'); ?> <span class="badge bg-warning text-dark">Modified</span>';
+                                } else {
+                                    restoreButton.classList.remove('btn-warning');
+                                    restoreButton.classList.add('btn-outline-secondary');
+                                    restoreButton.disabled = true;
+                                    restoreButton.innerHTML = '<i class="fas fa-undo"></i> <?php echo t('Restore Default Prompt'); ?>';
+                                }
+                            }
+                        }
+                        
+                        // Check modification status on page load and when textarea changes
+                        document.addEventListener('DOMContentLoaded', function() {
+                            // Handle instructions textarea
+                            const instructionsTextarea = document.getElementById('instructions');
+                            if (instructionsTextarea) {
+                                updateInstructionsModifiedStatus();
+                                instructionsTextarea.addEventListener('input', updateInstructionsModifiedStatus);
+                            }
+                            
+                            // Handle link selection rules textarea
+                            const rulesTextarea = document.getElementById('link_selection_rules');
+                            if (rulesTextarea) {
+                                updateRulesModifiedStatus();
+                                rulesTextarea.addEventListener('input', updateRulesModifiedStatus);
+                            }
+
+                            // Handle welcome message prompt textarea
+                            const welcomePromptTextarea = document.getElementById('welcome_message_prompt');
+                            if (welcomePromptTextarea) {
+                                updateWelcomePromptModifiedStatus();
+                                welcomePromptTextarea.addEventListener('input', updateWelcomePromptModifiedStatus);
+                            }
+                        });
+                    </script>
 
                     <!-- Debug Context Fields -->
-                    <fieldset class="mb-4" id="debugContextFields" style="<?php echo $debugMode ? '' : 'display: none;'; ?>">
+                    <fieldset class="mb-4" id="debugContextFields"
+                        style="<?php echo $debugMode ? '' : 'display: none;'; ?>">
                         <legend><?php echo t('Debug Context Fields'); ?></legend>
-                        <div class="alert alert-info">
-                            <p><?php echo t('These fields allow you to test the AI with specific page context. They will be used when sending messages in debug mode.'); ?></p>
-                        </div>
-                        
+
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
@@ -955,18 +1077,22 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 </div>
                             </div>
                         </div>
+                        <div class="alert alert-info">
+                            <?php echo t('These fields allow you to test the AI with specific page context. They will be used when sending messages in debug mode.'); ?>
+                        </div>
+
                     </fieldset>
 
                     <script>
                         window.katalysisAIDebugMode = <?php echo $debugMode ? 'true' : 'false'; ?>;
-                        
+
                         // Toggle debug context fields visibility
-                        document.addEventListener('DOMContentLoaded', function() {
+                        document.addEventListener('DOMContentLoaded', function () {
                             const debugModeCheckbox = document.getElementById('debug_mode');
                             const debugContextFields = document.getElementById('debugContextFields');
-                            
+
                             if (debugModeCheckbox && debugContextFields) {
-                                debugModeCheckbox.addEventListener('change', function() {
+                                debugModeCheckbox.addEventListener('change', function () {
                                     debugContextFields.style.display = this.checked ? 'block' : 'none';
                                     window.katalysisAIDebugMode = this.checked;
                                 });
