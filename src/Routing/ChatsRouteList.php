@@ -20,11 +20,11 @@ class ChatsRouteList implements RouteListInterface
 {
     public function loadRoutes(Router $router)
     {
-        $router->buildGroup()->setNamespace('Concrete\Package\use KatalysisAiChatBot\Controller\Dialog\Chats')
+        $router->buildGroup()->setNamespace('Concrete\Package\KatalysisAiChatBot\Controller\Dialog\Chats')
             ->setPrefix('/ccm/system/dialogs/chats')
             ->routes('dialogs/chats.php', 'katalysis_ai_chat_bot');
     
-        $router->buildGroup()->setNamespace('Concrete\Package\use KatalysisAiChatBot\Controller\Search')
+        $router->buildGroup()->setNamespace('Concrete\Package\KatalysisAiChatBot\Controller\Search')
             ->setPrefix('/ccm/system/search/chats')
             ->routes('search/chats.php', 'katalysis_ai_chat_bot');
     }

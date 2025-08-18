@@ -128,7 +128,7 @@ use KatalysisAiChatBot\ChatsMenu;
             searchResultsTable.setupBulkActions();
             
             $('#ccm-search-results-table').on('click', 'a[data-id]', function () {
-                window.location.href = '<?=rtrim(URL::to('/dashboard/katalysis_ai_chat_bot/chats', 'edit'), '/')?>/' + $(this).attr('data-id');
+                window.location.href = '<?=rtrim(URL::to('/dashboard/katalysis_ai_chat_bot/chats', 'view_chat'), '/')?>/' + $(this).attr('data-id');
                 return false;
             });
             

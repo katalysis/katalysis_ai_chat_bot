@@ -10,13 +10,15 @@ use AssetList;
 use Asset;
 use Concrete\Core\Command\Task\Manager as TaskManager;
 use KatalysisAiChatBot\Command\Task\Controller\BuildRagIndexController;
+use Concrete\Core\Block\BlockType\BlockType;
+use Concrete\Core\Block\BlockType\Set as BlockTypeSet;
 
 class Controller extends Package
 {
     protected $pkgHandle = 'katalysis_ai_chat_bot';
     protected $appVersionRequired = '9.3';
-    protected $pkgVersion = '0.1.3';
-    protected $pkgAutoloaderRegistries = [
+    protected $pkgVersion = '0.1.11';
+        protected $pkgAutoloaderRegistries = [
         'src' => 'KatalysisAiChatBot'
     ];
 
@@ -34,10 +36,17 @@ class Controller extends Package
         '/dashboard/katalysis_ai_chat_bot/chats' => array(
             'cName' => 'Chats'
         ),
+        '/dashboard/katalysis_ai_chat_bot/actions' => array(
+            'cName' => 'Actions'
+        ),
         '/dashboard/katalysis_ai_chat_bot/chat_bot_settings' => array(
             'cName' => 'Chat Bot Settings'
         ),
 
+    );
+
+    protected $blocks = array(
+        'katalysis_ai_chat_bot'
     );
 
     public function getPackageName()
@@ -87,6 +96,25 @@ class Controller extends Package
 
         $this->installPages($pkg);
         $this->installContentFile('build_rag_index.xml');
+        $this->installContentFile('install_permissions.xml');
+
+        // Create Katalysis block set if it doesn't exist
+        if (!BlockTypeSet::getByHandle('katalysis')) {
+            BlockTypeSet::add('katalysis', 'Katalysis', $pkg);
+        }
+
+        // Install the chatbot block
+        BlockType::installBlockTypeFromPackage('katalysis_ai_chat_bot', $pkg);
+
+        $blockType = BlockType::getByHandle('katalysis_ai_chat_bot');
+        
+        // Add the block to the Katalysis block set
+        if ($blockType) {
+            $blockSet = BlockTypeSet::getByHandle('katalysis');
+            if ($blockSet) {
+                $blockSet->addBlockType($blockType);
+            }
+        }
         
     }
 
@@ -94,9 +122,27 @@ class Controller extends Package
     {
 		parent::upgrade();
 
-        $this->installContentFile('build_rag_index.xml');
+        $this->installContentFile('install_permissions.xml');
 
+        $pkg = Package::getByHandle("katalysis_ai_chat_bot");
 
+        // Create Katalysis block set if it doesn't exist
+        if (!BlockTypeSet::getByHandle('katalysis')) {
+            BlockTypeSet::add('katalysis', 'Katalysis', $pkg);
+        }
+
+        // Install the chatbot block
+        BlockType::installBlockTypeFromPackage('katalysis_ai_chat_bot', $pkg);
+
+        $blockType = BlockType::getByHandle('katalysis_ai_chat_bot');
+
+        // Add the block to the Katalysis block set
+        if ($blockType) {
+            $blockSet = BlockTypeSet::getByHandle('katalysis');
+            if ($blockSet) {
+                $blockSet->addBlockType($blockType);
+            }
+        }
     }
 
 

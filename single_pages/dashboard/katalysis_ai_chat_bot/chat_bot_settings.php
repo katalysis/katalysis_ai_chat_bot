@@ -1,24 +1,39 @@
 <?php
 defined('C5_EXECUTE') or die('Access Denied.');
+
+use \Concrete\Core\Page\Page;
+use \Concrete\Core\Support\Facade\Url;
+use \Concrete\Core\Support\Facade\Config;
+$app = \Concrete\Core\Support\Facade\Application::getFacadeApplication();
+$ps = $app->make('helper/form/page_selector');
+
 ?>
 
 <form method="post" enctype="multipart/form-data" action="<?= $controller->action('save') ?>">
     <?php $token->output('ai.settings'); ?>
     <div id="ccm-dashboard-content-inner">
 
-        <script type="module" src="/packages/katalysis_ai_chat_bot/js/scrolly-rail.js"></script>
-
         <div class="row mb-5 justify-content-between">
 
             <div class="col-12 col-md-8 col-lg-6">
                 <div class="alert alert-primary mb-5">
                     <h5><i class="fas fa-robot"></i> <?php echo t('AI Chat Bot System Overview'); ?></h5>
-                    <p class="mb-3"><?php echo t('This system provides an intelligent AI chatbot that can understand your website content and provide contextual responses. Here\'s how it works:'); ?></p>
+                    <p class="mb-3">
+                        <?php echo t('This system provides an intelligent AI chatbot that can understand your website content and provide contextual responses. Here\'s how it works:'); ?>
+                    </p>
                     <ul class="mb-0">
-                        <li><strong><?php echo t('Content Indexing'); ?></strong> - <?php echo t('Your website pages are automatically indexed, including key attributes like page titles, page types, URLs, and content.'); ?></li>
-                        <li><strong><?php echo t('Context Awareness'); ?></strong> - <?php echo t('The AI uses this indexed information to understand what page the user is on and provide relevant responses.'); ?></li>
-                        <li><strong><?php echo t('Dynamic Responses'); ?></strong> - <?php echo t('AI generates personalized welcome messages and intelligent responses based on the user\'s context and your content.'); ?></li>
-                        <li><strong><?php echo t('Smart Link Selection'); ?></strong> - <?php echo t('The system intelligently selects the most relevant links to include with responses, helping users find related information.'); ?></li>
+                        <li><strong><?php echo t('Content Indexing'); ?></strong> -
+                            <?php echo t('Your website pages are automatically indexed, including key attributes like page titles, page types, URLs, and content.'); ?>
+                        </li>
+                        <li><strong><?php echo t('Context Awareness'); ?></strong> -
+                            <?php echo t('The AI uses this indexed information to understand what page the user is on and provide relevant responses.'); ?>
+                        </li>
+                        <li><strong><?php echo t('Dynamic Responses'); ?></strong> -
+                            <?php echo t('AI generates personalized welcome messages and intelligent responses based on the user\'s context and your content.'); ?>
+                        </li>
+                        <li><strong><?php echo t('Smart Link Selection'); ?></strong> -
+                            <?php echo t('The system intelligently selects the most relevant links to include with responses, helping users find related information.'); ?>
+                        </li>
                     </ul>
                 </div>
 
@@ -49,12 +64,15 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     </div>
                     <div class="alert alert-info">
                         <h6><?php echo t('Main AI Instructions'); ?></h6>
-                        <p><?php echo t('These instructions define how the AI responds to user questions. They guide the AI\'s personality, tone, and approach to providing information.'); ?></p>
-                        
+                        <p><?php echo t('These instructions define how the AI responds to user questions. They guide the AI\'s personality, tone, and approach to providing information.'); ?>
+                        </p>
+
                         <h6><?php echo t('Available Context Placeholders'); ?></h6>
                         <p><?php echo t('You can use these placeholders to make responses context-aware:'); ?></p>
                         <ul>
-                            <li><code>{page_type}</code> - <?php echo t('The page type of the current page (e.g., location, service, blog, page)'); ?></li>
+                            <li><code>{page_type}</code> -
+                                <?php echo t('The page type of the current page (e.g., location, service, blog, page)'); ?>
+                            </li>
                             <li><code>{page_title}</code> - <?php echo t('The title of the current page'); ?></li>
                             <li><code>{page_url}</code> - <?php echo t('The URL of the current page'); ?></li>
                         </ul>
@@ -62,14 +80,17 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         <h6><?php echo t('Example Instructions'); ?></h6>
                         <div class="alert alert-success">
                             <p><strong><?php echo t('Location-specific responses:'); ?></strong></p>
-                            <p><code><?php echo t('If the page type is "location", mention that we are based in your local area and can provide on-site services. Always include local contact information.'); ?></code></p>
-                            
+                            <p><code><?php echo t('If the page type is "location", mention that we are based in your local area and can provide on-site services. Always include local contact information.'); ?></code>
+                            </p>
+
                             <p><strong><?php echo t('Service page responses:'); ?></strong></p>
-                            <p><code><?php echo t('If the page type is "service", focus on the specific service mentioned in {page_title} and provide detailed information about our expertise in this area.'); ?></code></p>
+                            <p><code><?php echo t('If the page type is "service", focus on the specific service mentioned in {page_title} and provide detailed information about our expertise in this area.'); ?></code>
+                            </p>
                         </div>
                     </div>
                     <div class="text-end">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restoreDefaultInstructions()">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                            onclick="restoreDefaultInstructions()">
                             <i class="fas fa-undo"></i> <?php echo t('Restore Default Instructions'); ?>
                         </button>
                     </div>
@@ -103,22 +124,31 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     </div>
                     <div class="alert alert-info">
                         <h6><?php echo t('Welcome Message Generation'); ?></h6>
-                        <p><?php echo t('This prompt controls how the AI generates personalized welcome messages when users first visit the chat. The AI uses this prompt along with current context to create dynamic, relevant greetings.'); ?></p>
-                        
+                        <p><?php echo t('This prompt controls how the AI generates personalized welcome messages when users first visit the chat. The AI uses this prompt along with current context to create dynamic, relevant greetings.'); ?>
+                        </p>
+
                         <h6><?php echo t('Context Placeholders'); ?></h6>
                         <p><?php echo t('Use these placeholders to include dynamic information:'); ?></p>
                         <ul>
-                            <li><code>{time_of_day}</code> - <?php echo t('Automatically replaced with "morning", "afternoon", or "evening" based on current time'); ?></li>
-                            <li><code>{page_title}</code> - <?php echo t('The title of the page the user is currently viewing'); ?></li>
+                            <li><code>{time_of_day}</code> -
+                                <?php echo t('Automatically replaced with "morning", "afternoon", or "evening" based on current time'); ?>
+                            </li>
+                            <li><code>{page_title}</code> -
+                                <?php echo t('The title of the page the user is currently viewing'); ?>
+                            </li>
                             <li><code>{page_url}</code> - <?php echo t('The URL of the current page'); ?></li>
                         </ul>
 
                         <h6><?php echo t('Example Usage'); ?></h6>
-                        <p><code><?php echo t('Good {time_of_day}! Welcome to our {page_title} page. How can we help you today?'); ?></code></p>
-                        <p><small class="text-muted"><?php echo t('This would generate: "Good morning! Welcome to our Legal Services page. How can we help you today?"'); ?></small></p>
+                        <p><code><?php echo t('Good {time_of_day}! Welcome to our {page_title} page. How can we help you today?'); ?></code>
+                        </p>
+                        <p><small
+                                class="text-muted"><?php echo t('This would generate: "Good morning! Welcome to our Legal Services page. How can we help you today?"'); ?></small>
+                        </p>
                     </div>
                     <div class="text-end">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restoreDefaultWelcomePrompt()">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                            onclick="restoreDefaultWelcomePrompt()">
                             <i class="fas fa-undo"></i> <?php echo t('Restore Default Prompt'); ?>
                         </button>
                     </div>
@@ -152,36 +182,76 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     </div>
                     <div class="alert alert-info">
                         <h6><?php echo t('Intelligent Link Selection'); ?></h6>
-                        <p><?php echo t('These rules guide the AI when selecting which links to include with responses. Instead of showing all available links, the AI intelligently chooses the most relevant ones based on the user\'s question and context.'); ?></p>
-                        
+                        <p><?php echo t('These rules guide the AI when selecting which links to include with responses. Instead of showing all available links, the AI intelligently chooses the most relevant ones based on the user\'s question and context.'); ?>
+                        </p>
+
                         <h6><?php echo t('How It Works'); ?></h6>
                         <ul>
                             <li><?php echo t('The system searches your indexed content for relevant documents'); ?></li>
                             <li><?php echo t('The AI analyzes the user\'s question and available documents'); ?></li>
                             <li><?php echo t('Using these rules, the AI selects 1-3 most relevant links'); ?></li>
-                            <li><?php echo t('Links are displayed as "More Information" buttons below responses'); ?></li>
+                            <li><?php echo t('Links are displayed as "More Information" buttons below responses'); ?>
+                            </li>
                         </ul>
 
                         <h6><?php echo t('Page Type Context'); ?></h6>
-                        <p><?php echo t('Available page types in your system include:'); ?> 
-                        <?php 
-                        $pageTypeNames = array_map(function($pt) { return $pt['name']; }, $pageTypes);
-                        echo implode(', ', array_slice($pageTypeNames, 0, 5));
-                        if (count($pageTypeNames) > 5) {
-                            echo ' and ' . (count($pageTypeNames) - 5) . ' more';
-                        }
-                        ?>.</p>
-                        
-                        <p><small class="text-muted"><?php echo t('You can reference specific page types in your rules to control link selection behavior.'); ?></small></p>
+                        <p><?php echo t('Available page types in your system include:'); ?>
+                            <?php
+                            $pageTypeNames = array_map(function ($pt) {
+                                return $pt['name'];
+                            }, $pageTypes);
+                            echo implode(', ', array_slice($pageTypeNames, 0, 5));
+                            if (count($pageTypeNames) > 5) {
+                                echo ' and ' . (count($pageTypeNames) - 5) . ' more';
+                            }
+                            ?>.
+                        </p>
+
+                        <p><small
+                                class="text-muted"><?php echo t('You can reference specific page types in your rules to control link selection behavior.'); ?></small>
+                        </p>
                     </div>
                     <div class="text-end">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="restoreDefaultLinkRules()">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                            onclick="restoreDefaultLinkRules()">
                             <i class="fas fa-undo"></i> <?php echo t('Restore Default Rules'); ?>
                         </button>
                     </div>
                 </fieldset>
 
-                
+                <fieldset class="mb-5">
+                    <legend><?php echo t('Contact Page Configuration'); ?></legend>
+                    <div class="row">
+                        <div class="col">
+                            <div class="form-group">
+                                <label for="page"
+                                    class="control-label form-label"><?php echo t('Contact Page') ?></label>
+                                <?= $ps->selectPage('contact_page_id', isset($contactPageID) ? $contactPageID : null); ?>
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <h6><?php echo t('Contact Link Generation'); ?></h6>
+                        <p><?php echo t('When the AI mentions "contact us" in responses, it will automatically create a clickable link to the selected page. This ensures users can easily reach your contact information.'); ?>
+                        </p>
+
+                        <h6><?php echo t('How It Works'); ?></h6>
+                        <ul>
+                            <li><?php echo t('Select the page where users can contact you (e.g., Contact Us, Get in Touch, Hire Us)'); ?>
+                            </li>
+                            <li><?php echo t('The AI will automatically convert "contact us" text to clickable links'); ?>
+                            </li>
+                            <li><?php echo t('Links open in a new tab for better user experience'); ?></li>
+                        </ul>
+
+                        <p><small
+                                class="text-muted"><?php echo t('If no page is selected, the system will use "/contact-us" as the default.'); ?></small>
+                        </p>
+                    </div>
+                </fieldset>
+
+
             </div>
 
             <div class="col-12 col-md-8 col-lg-5" style="max-width:500px;">
@@ -208,6 +278,28 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         animation: welcomeBounce 0.6s ease-out forwards;
                     }
 
+                    .ai-header {
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        border-radius: 15px;
+                        padding: 20px;
+                        border: 1px solid #dee2e6;
+                    }
+
+                    .ai-header-content {
+                        transition: all 0.3s ease;
+                    }
+
+                    .ai-header:hover .ai-header-content {
+                        transform: translateY(-2px);
+                    }
+
+                    #ai-header-greeting {
+                        color: var(--bs-primary, #007cba);
+                        font-weight: 600;
+                        transition: color 0.3s ease;
+                        min-height: 1.5em;
+                    }
+
                 </style>
                 <script>
                     function renderMarkdown(markdown) {
@@ -217,8 +309,11 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     // Function to process AI response content and convert "contact us" to links
                     function processAIResponseContent(content) {
                         if (content && typeof content === 'string') {
+                            // Use the configured contact page URL from PHP
+                            const contactUrl = <?php echo json_encode($contactPageUrl); ?>;
+
                             // Case-insensitive replacement for "contact us" variations
-                            return content.replace(/\b(contact us|Contact Us|CONTACT US)\b/g, '<a href="/contact" target="_blank" class="text-primary fw-bold">$1</a>');
+                            return content.replace(/\b(contact us|Contact Us|CONTACT US)\b/g, `<a href="${contactUrl}" target="_blank" class="text-primary fw-bold">$1</a>`);
                         }
                         return content;
                     }
@@ -230,39 +325,20 @@ defined('C5_EXECUTE') or die('Access Denied.');
                     // Initialize currentMode variable
                     let currentMode = 'rag'; // Default to RAG mode
 
-                    // Function to generate dynamic welcome message using AI
-                    function generateWelcomeMessage() {
-                        const now = new Date();
-                        const hour = now.getHours();
 
-                        let timeGreeting = '';
-                        if (hour < 12) {
-                            timeGreeting = 'Good morning';
-                        } else if (hour < 17) {
-                            timeGreeting = 'Good afternoon';
-                        } else {
-                            timeGreeting = 'Good evening';
-                        }
 
-                        // Get page information if available
-                        let pageInfo = '';
-                        try {
-                            // Try to get page title from document
-                            const pageTitle = document.title || '';
-                            if (pageTitle && pageTitle !== '') {
-                                pageInfo = `, welcome to our ${pageTitle.toLowerCase().includes('legal') ? 'legal ' : ''}website`;
-                            } else {
-                                pageInfo = ', welcome to our website';
-                            }
-                        } catch (e) {
-                            pageInfo = ', welcome to our website';
-                        }
-
-                        return `${timeGreeting}${pageInfo}. How can we help you today?`;
+                    // Function to regenerate welcome message (resets flag and calls generateAIWelcomeMessage)
+                    function regenerateWelcomeMessage() {
+                        console.log('Regenerating welcome message...');
+                        welcomeMessageGenerated = false;
+                        generateAIWelcomeMessage();
                     }
 
                     // Function to generate AI-powered welcome message
                     function generateAIWelcomeMessage() {
+                        console.log('generateAIWelcomeMessage called');
+                        console.log('welcomeMessageGenerated flag:', welcomeMessageGenerated);
+
                         const now = new Date();
                         const hour = now.getHours();
 
@@ -282,21 +358,32 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             if (debugPageUrl) pageUrl = debugPageUrl;
                         }
 
-                        // Get the configurable welcome message prompt
-                        let welcomePrompt = `<?php echo addslashes($welcomeMessagePrompt); ?>`;
-                        
+                        console.log('Page context - Title:', pageTitle, 'URL:', pageUrl, 'Type:', pageType);
+
+                        // Get the configurable welcome message prompt from the textarea
+                        let welcomePrompt = document.getElementById('welcome_message_prompt').value || `<?php echo addslashes($welcomeMessagePrompt); ?>`;
+
+                        console.log('=== WELCOME MESSAGE DEBUG ===');
+                        console.log('Textarea value:', document.getElementById('welcome_message_prompt').value);
+                        console.log('PHP fallback value:', `<?php echo addslashes($welcomeMessagePrompt); ?>`);
+                        console.log('Final welcomePrompt before replacements:', welcomePrompt);
+
                         // Replace placeholders with actual values
                         welcomePrompt = welcomePrompt.replace(/{time_of_day}/g, hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening');
                         welcomePrompt = welcomePrompt.replace(/{page_title}/g, pageTitle);
                         welcomePrompt = welcomePrompt.replace(/{page_url}/g, pageUrl);
-                        
+
                         // Append essential formatting instructions
                         welcomePrompt += `<?php echo addslashes($essentialWelcomeMessageInstructions); ?>`;
+
+                        console.log('Welcome prompt prepared:', welcomePrompt.substring(0, 200) + '...');
+                        console.log('Full welcome prompt:', welcomePrompt);
+                        console.log('=== END WELCOME MESSAGE DEBUG ===');
 
                         // Prepare request data with debug context if enabled
                         let requestData = {
                             message: welcomePrompt,
-                            mode: 'basic' // Use basic mode for welcome message generation
+                            mode: 'basic' // Use basic mode for welcome message generation to avoid RAG instructions override
                         };
 
                         // Add debug context if debug mode is enabled and debug fields have values
@@ -314,6 +401,8 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 console.log('Adding debug context to welcome message request:', requestData.debug_context);
                             }
                         }
+
+                        console.log('Sending welcome message request:', requestData);
 
                         // Use the existing AI system to generate the welcome message
                         $.ajax({
@@ -335,17 +424,44 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                     welcomeText = data;
                                 }
 
+                                console.log('Processed welcome text:', welcomeText);
+                                console.log('Welcome text length:', welcomeText ? welcomeText.length : 0);
+
                                 // Show and animate the welcome response
                                 const welcomeResponse = document.getElementById('welcome-response');
                                 const welcomeElement = document.getElementById('welcome-message');
+
+                                console.log('Welcome response element found:', !!welcomeResponse);
+                                console.log('Welcome message element found:', !!welcomeElement);
 
                                 if (welcomeResponse && welcomeElement) {
                                     // Set the message text
                                     if (welcomeText && welcomeText.trim()) {
                                         welcomeElement.textContent = welcomeText;
+                                        
+                                        // Also update the header greeting
+                                        const headerGreeting = document.getElementById('ai-header-greeting');
+                                        console.log('Header greeting element found:', !!headerGreeting);
+                                        if (headerGreeting) {
+                                            // Extract a short greeting from the welcome message (first sentence or first 50 chars)
+                                            let shortGreeting = welcomeText.split('.')[0]; // Get first sentence
+                                            if (shortGreeting.length > 50) {
+                                                shortGreeting = welcomeText.substring(0, 50) + '...';
+                                            }
+                                            console.log('Updating header greeting to:', shortGreeting);
+                                            headerGreeting.textContent = shortGreeting;
+                                        } else {
+                                            console.error('Header greeting element not found!');
+                                        }
                                     } else {
-                                        // If AI response is empty, show fallback
-                                        welcomeElement.textContent = 'Hi, How can we help today?';
+                                        // If AI response is empty, show a simple welcome message
+                                        welcomeElement.textContent = 'Hi! How can we help you today?';
+                                        
+                                        // Update header with simple greeting
+                                        const headerGreeting = document.getElementById('ai-header-greeting');
+                                        if (headerGreeting) {
+                                            headerGreeting.textContent = 'Hi! How can we help you today?';
+                                        }
                                     }
 
                                     // Show the response div
@@ -358,24 +474,36 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                     setTimeout(function () {
                                         welcomeResponse.classList.remove('welcome-animate');
                                     }, 600);
+                                } else {
+                                    console.error('Welcome response elements not found!');
+                                    console.error('welcomeResponse:', welcomeResponse);
+                                    console.error('welcomeElement:', welcomeElement);
                                 }
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error generating AI welcome message:', error);
-                                // Show fallback with animation
+                                console.error('Error generating welcome message:', error);
+                                console.error('Status:', status);
+                                console.error('Response:', xhr.responseText);
+
+                                // Show a fallback welcome message on error
                                 const welcomeResponse = document.getElementById('welcome-response');
                                 const welcomeElement = document.getElementById('welcome-message');
 
                                 if (welcomeResponse && welcomeElement) {
-                                    welcomeElement.textContent = 'Hi, How can we help today?';
-
-                                    // Show the response div
+                                    welcomeElement.textContent = 'Hi! How can we help you today?';
                                     welcomeResponse.style.display = 'flex';
-
-                                    // Add animation class
                                     welcomeResponse.classList.add('welcome-animate');
 
-                                    // Remove animation class after animation completes
+                                    // Update header with fallback greeting
+                                    const headerGreeting = document.getElementById('ai-header-greeting');
+                                    console.log('Error handling - Header greeting element found:', !!headerGreeting);
+                                    if (headerGreeting) {
+                                        headerGreeting.textContent = 'Hi! How can we help you today?';
+                                        console.log('Updated header greeting in error handling');
+                                    } else {
+                                        console.error('Header greeting element not found in error handling!');
+                                    }
+
                                     setTimeout(function () {
                                         welcomeResponse.classList.remove('welcome-animate');
                                     }, 600);
@@ -465,6 +593,17 @@ defined('C5_EXECUTE') or die('Access Denied.');
 
                                     console.log('Chat history loaded successfully');
 
+                                    // Check if the loaded chat history contains any messages
+                                    const hasMessages = chatContainer.querySelector('.user-message, .ai-response') !== null;
+
+                                    if (!hasMessages && !welcomeMessageGenerated) {
+                                        console.log('Chat history loaded but no messages found, generating welcome message...');
+                                        welcomeMessageGenerated = true;
+                                        setTimeout(function () {
+                                            generateAIWelcomeMessage();
+                                        }, 500);
+                                    }
+
                                     // Scroll to bottom after loading
                                     setTimeout(function () {
                                         scrollToBottom();
@@ -475,9 +614,23 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 }
                             } else {
                                 console.log('No saved chat history found');
+                                // If no saved chat history, ensure welcome message is generated
+                                if (!welcomeMessageGenerated) {
+                                    welcomeMessageGenerated = true;
+                                    setTimeout(function () {
+                                        generateAIWelcomeMessage();
+                                    }, 500);
+                                }
                             }
                         } catch (e) {
                             console.error('Error loading chat history:', e);
+                            // If there's an error loading chat history, still try to generate welcome message
+                            if (!welcomeMessageGenerated) {
+                                welcomeMessageGenerated = true;
+                                setTimeout(function () {
+                                    generateAIWelcomeMessage();
+                                }, 500);
+                            }
                         }
                     }
 
@@ -488,6 +641,9 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         localStorage.removeItem('katalysis_chat_history');
                         localStorage.removeItem('katalysis_chat_timestamp');
 
+                        // Reset chat session ID
+                        chatSessionId = null;
+
                         // Clear server-side chat files
                         $.ajax({
                             type: "POST",
@@ -497,12 +653,60 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             },
                             success: function (data) {
                                 console.log('Server chat history cleared:', data);
-                                location.reload();
+                                // Instead of reloading, clear the chat container and generate welcome message
+                                const chatContainer = document.getElementById('chat');
+                                if (chatContainer) {
+                                    // Keep the divider and welcome response elements
+                                    const divider = chatContainer.querySelector('.divider');
+                                    const welcomeResponse = chatContainer.querySelector('#welcome-response');
+
+                                    // Clear the container
+                                    chatContainer.innerHTML = '';
+
+                                    // Restore the divider
+                                    if (divider) {
+                                        chatContainer.appendChild(divider);
+                                    }
+
+                                    // Restore the welcome response element
+                                    if (welcomeResponse) {
+                                        chatContainer.appendChild(welcomeResponse);
+                                    }
+
+                                    // Generate welcome message
+                                    if (!welcomeMessageGenerated) {
+                                        welcomeMessageGenerated = true;
+                                        setTimeout(function () {
+                                            generateAIWelcomeMessage();
+                                        }, 500);
+                                    }
+                                }
                             },
                             error: function (xhr, status, error) {
                                 console.error('Error clearing server chat history:', error);
-                                // Still reload even if server clear fails
-                                location.reload();
+                                // Still try to clear locally and generate welcome message
+                                const chatContainer = document.getElementById('chat');
+                                if (chatContainer) {
+                                    const divider = chatContainer.querySelector('.divider');
+                                    const welcomeResponse = chatContainer.querySelector('#welcome-response');
+
+                                    chatContainer.innerHTML = '';
+
+                                    if (divider) {
+                                        chatContainer.appendChild(divider);
+                                    }
+
+                                    if (welcomeResponse) {
+                                        chatContainer.appendChild(welcomeResponse);
+                                    }
+
+                                    if (!welcomeMessageGenerated) {
+                                        welcomeMessageGenerated = true;
+                                        setTimeout(function () {
+                                            generateAIWelcomeMessage();
+                                        }, 500);
+                                    }
+                                }
                             }
                         });
 
@@ -527,33 +731,53 @@ defined('C5_EXECUTE') or die('Access Denied.');
 
                     // Track if welcome message has been generated to prevent duplicates
                     let welcomeMessageGenerated = false;
+                    let chatSessionId = null; // Track current chat session
+
+                    // Function to check if welcome message elements exist
+                    function checkWelcomeElements() {
+                        const welcomeResponse = document.getElementById('welcome-response');
+                        const welcomeElement = document.getElementById('welcome-message');
+
+                        console.log('Welcome elements check:');
+                        console.log('- welcome-response exists:', !!welcomeResponse);
+                        console.log('- welcome-message exists:', !!welcomeElement);
+
+                        if (welcomeResponse) {
+                            console.log('- welcome-response display:', welcomeResponse.style.display);
+                            console.log('- welcome-response visibility:', window.getComputedStyle(welcomeResponse).visibility);
+                        }
+
+                        return welcomeResponse && welcomeElement;
+                    }
 
                     // Load chat history when page loads
                     $(document).ready(function () {
                         console.log('jQuery ready - loading chat history...');
+
+                        // Check welcome elements immediately
+                        checkWelcomeElements();
+
                         loadChatHistory();
 
-                        // Generate AI welcome message only once
-                        if (!welcomeMessageGenerated) {
-                            welcomeMessageGenerated = true;
-                            setTimeout(function () {
+                        // Generate AI welcome message after a delay to ensure everything is loaded
+                        setTimeout(function () {
+                            if (!welcomeMessageGenerated) {
+                                welcomeMessageGenerated = true;
                                 generateAIWelcomeMessage();
-                            }, 500); // Small delay to ensure everything is loaded
-                        }
-                    });
+                            }
+                        }, 1000); // Increased delay to ensure chat history is loaded first
 
-                    // Also try loading with vanilla JS
-                    document.addEventListener('DOMContentLoaded', function () {
-                        console.log('DOM loaded - loading chat history...');
-                        loadChatHistory();
-
-                        // Generate AI welcome message only once
-                        if (!welcomeMessageGenerated) {
-                            welcomeMessageGenerated = true;
-                            setTimeout(function () {
-                                generateAIWelcomeMessage();
-                            }, 500); // Small delay to ensure everything is loaded
-                        }
+                        // Fallback: Ensure welcome message is shown after 3 seconds if still not generated
+                        setTimeout(function () {
+                            const welcomeResponse = document.getElementById('welcome-response');
+                            if (welcomeResponse && welcomeResponse.style.display === 'none') {
+                                console.log('Fallback: Welcome message not shown, generating now...');
+                                if (!welcomeMessageGenerated) {
+                                    welcomeMessageGenerated = true;
+                                    generateAIWelcomeMessage();
+                                }
+                            }
+                        }, 3000);
                     });
 
                     // Your existing addMessage function
@@ -572,11 +796,25 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         saveChatHistory(); // Save after loading indicator
                         scrollToBottom();
 
+                        // Check if this is a new chat session (no existing chat session ID)
+                        const isNewChat = !chatSessionId;
+
                         // Prepare request data with debug context if enabled
                         let requestData = {
                             message: messageValue,
-                            mode: currentMode
+                            mode: currentMode,
+                            new_chat: isNewChat
                         };
+
+                        // Add page context information for new chats
+                        if (isNewChat) {
+                            const debugPageTitle = document.getElementById('debug_page_title')?.value || '';
+                            const debugPageType = document.getElementById('debug_page_type')?.value || '';
+                            const debugPageUrl = document.getElementById('debug_page_url')?.value || '';
+                            requestData.page_title = debugPageTitle || document.title || '';
+                            requestData.page_type = debugPageType || '';
+                            requestData.page_url = debugPageUrl || window.location.pathname || '';
+                        }
 
                         // Add debug context if debug mode is enabled
                         if (window.katalysisAIDebugMode) {
@@ -618,16 +856,25 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 // Process the response content to convert "contact us" to links
                                 let processedContent = processAIResponseContent(responseContent);
 
-                                let responseHtml = '<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>' + renderMarkdown(processedContent);
+                                let responseHtml = '<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div class="message-content">' + renderMarkdown(processedContent);
 
                                 // Add "More Info" links if metadata is available
-                                if (metadata && metadata.length > 0) {
-                                    responseHtml += '<div class="more-info-links mt-3"><strong>More Information:</strong><ul class="list-unstyled mt-2">';
-                                    metadata.forEach(function (link) {
-                                        responseHtml += '<li><a href="' + link.url + '" target="_blank" class="btn btn-sm btn-outline-primary me-2 mb-1">' + link.title + '</a></li>';
+                                responseHtml += '<div class="more-info-links mt-3"><strong class="d-block mb-2">More Information:</strong>';
+                                // Insert action buttons here, if any
+                                if (data.actions && data.actions.length > 0) {
+                                    responseHtml += '<div class="action-buttons">';
+                                    data.actions.forEach(function (action) {
+                                        responseHtml += '<button class="action-button btn btn-sm btn-primary me-2 mb-2" data-action-id="' + action.id + '" data-action-name="' + action.name + '" data-response-instruction="' + action.responseInstruction + '" onclick="executeAction(' + action.id + ', \'' + action.name + '\')">';
+                                        responseHtml += '<i class="' + action.icon + '"></i> ' + action.name;
+                                        responseHtml += '</button>';
                                     });
-                                    responseHtml += '</ul></div>';
+                                    responseHtml += '</div>';
                                 }
+                                responseHtml += '<ul class="list-unstyled m-0 p-0">';
+                                metadata.forEach(function (link) {
+                                    responseHtml += '<li><a href="' + link.url + '" target="_blank" class="btn btn-sm btn-outline-primary mb-2"><i class="fas fa-link"></i> ' + link.title + '</a></li>';
+                                });
+                                responseHtml += '</ul></div>';
 
                                 // Show debug info if enabled
                                 if (window.katalysisAIDebugMode) {
@@ -637,7 +884,35 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 responseHtml += '</div></div>';
                                 $("#chat").append(responseHtml);
 
+                                // Store chat session ID if this is a new chat
+                                if (data.chat_id && !chatSessionId) {
+                                    chatSessionId = data.chat_id;
+                                    console.log('New chat session created with ID:', chatSessionId);
+                                }
+
                                 saveChatHistory(); // Save after AI response
+
+                                // Display action buttons if provided
+                                console.log('=== FRONTEND ACTION CHECK ===');
+                                console.log('Response data keys:', Object.keys(data));
+                                console.log('Actions field exists:', 'actions' in data);
+                                console.log('Actions value:', data.actions);
+
+                                // Check if action buttons container exists
+                                const actionButtons = document.getElementById('action-buttons');
+                                console.log('Action buttons container exists:', !!actionButtons);
+                                if (actionButtons) {
+                                    console.log('Action buttons container display:', actionButtons.style.display);
+                                }
+
+                                if (data.actions && data.actions.length > 0) {
+                                    console.log('Displaying action buttons:', data.actions);
+                                    // displayActionButtons(data.actions); // This function is no longer needed
+                                } else {
+                                    console.log('No actions to display');
+                                    // hideActionButtons(); // This function is no longer needed
+                                }
+
                                 scrollToBottom();
                                 document.getElementById('message').value = '';
                             },
@@ -666,11 +941,25 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         $("#chat").append('<div class="ai-loading">AI is thinking...</div>');
                         saveChatHistory(); // Save after adding loading indicator
 
+                        // Check if this is a new chat session (no existing chat session ID)
+                        const isNewChat = !chatSessionId;
+
                         // Prepare request data with debug context if enabled
                         let requestData = {
                             message: messageValue,
-                            mode: currentMode
+                            mode: currentMode,
+                            new_chat: isNewChat
                         };
+
+                        // Add page context information for new chats
+                        if (isNewChat) {
+                            const debugPageTitle = document.getElementById('debug_page_title')?.value || '';
+                            const debugPageType = document.getElementById('debug_page_type')?.value || '';
+                            const debugPageUrl = document.getElementById('debug_page_url')?.value || '';
+                            requestData.page_title = debugPageTitle || document.title || '';
+                            requestData.page_type = debugPageType || '';
+                            requestData.page_url = debugPageUrl || window.location.pathname || '';
+                        }
 
                         // Add debug context if debug mode is enabled
                         if (window.katalysisAIDebugMode) {
@@ -712,16 +1001,25 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 // Process the response content to convert "contact us" to links
                                 let processedContent = processAIResponseContent(responseContent);
 
-                                let responseHtml = '<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>' + renderMarkdown(processedContent);
+                                let responseHtml = '<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div class="message-content">' + renderMarkdown(processedContent);
 
                                 // Add "More Info" links if metadata is available
-                                if (metadata && metadata.length > 0) {
-                                    responseHtml += '<div class="more-info-links mt-3"><strong>More Information:</strong><ul class="list-unstyled mt-2">';
-                                    metadata.forEach(function (link) {
-                                        responseHtml += '<li><a href="' + link.url + '" target="_blank" class="btn btn-sm btn-outline-primary me-2 mb-1">' + link.title + '</a></li>';
+                                responseHtml += '<div class="more-info-links mt-3"><strong>More Information:</strong>';
+                                // Insert action buttons here, if any
+                                if (data.actions && data.actions.length > 0) {
+                                    responseHtml += '<div class="action-buttons-inline mt-2 mb-2">';
+                                    data.actions.forEach(function (action) {
+                                        responseHtml += '<button class="action-button btn btn-sm btn-primary me-2 mb-1" data-action-id="' + action.id + '" data-action-name="' + action.name + '" data-response-instruction="' + action.responseInstruction + '" onclick="executeAction(' + action.id + ', \'' + action.name + '\')">';
+                                        responseHtml += '<i class="' + action.icon + '"></i> ' + action.name;
+                                        responseHtml += '</button>';
                                     });
-                                    responseHtml += '</ul></div>';
+                                    responseHtml += '</div>';
                                 }
+                                responseHtml += '<ul class="list-unstyled mt-2">';
+                                metadata.forEach(function (link) {
+                                    responseHtml += '<li><a href="' + link.url + '" target="_blank" class="btn btn-sm btn-outline-primary me-2 mb-1">' + link.title + '</a></li>';
+                                });
+                                responseHtml += '</ul></div>';
 
                                 // Show debug info if enabled
                                 if (window.katalysisAIDebugMode) {
@@ -731,7 +1029,35 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 responseHtml += '</div></div>';
                                 $("#chat").append(responseHtml);
 
+                                // Store chat session ID if this is a new chat
+                                if (data.chat_id && !chatSessionId) {
+                                    chatSessionId = data.chat_id;
+                                    console.log('New chat session created with ID:', chatSessionId);
+                                }
+
                                 saveChatHistory(); // Save after AI response
+
+                                // Display action buttons if provided
+                                console.log('=== FRONTEND ACTION CHECK ===');
+                                console.log('Response data keys:', Object.keys(data));
+                                console.log('Actions field exists:', 'actions' in data);
+                                console.log('Actions value:', data.actions);
+
+                                // Check if action buttons container exists
+                                const actionButtons = document.getElementById('action-buttons');
+                                console.log('Action buttons container exists:', !!actionButtons);
+                                if (actionButtons) {
+                                    console.log('Action buttons container display:', actionButtons.style.display);
+                                }
+
+                                if (data.actions && data.actions.length > 0) {
+                                    console.log('Displaying action buttons:', data.actions);
+                                    // displayActionButtons(data.actions); // This function is no longer needed
+                                } else {
+                                    console.log('No actions to display');
+                                    // hideActionButtons(); // This function is no longer needed
+                                }
+
                                 scrollToBottom(); // Scroll after adding AI response
                                 document.getElementById('message').value = '';
                             },
@@ -759,9 +1085,45 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         scrollToBottom();
                     });
 
+                    // Function to build response HTML with inline action buttons
+                    function buildResponseHtml(responseContent, metadata, data) {
+                        // Process the response content to convert "contact us" to links
+                        let processedContent = processAIResponseContent(responseContent);
+
+                        let responseHtml = '<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>' + renderMarkdown(processedContent);
+
+                        // Add "More Info" links if metadata is available
+                        responseHtml += '<div class="more-info-links mt-3"><strong>More Information:</strong>';
+
+                        // Add action buttons inline if available
+                        if (data.actions && data.actions.length > 0) {
+                            responseHtml += '<div class="action-buttons-inline mt-2 mb-2">';
+                            data.actions.forEach(function (action) {
+                                responseHtml += '<button class="action-button btn btn-sm btn-primary me-2 mb-1" data-action-id="' + action.id + '" data-action-name="' + action.name + '" data-response-instruction="' + action.responseInstruction + '" onclick="executeAction(' + action.id + ', \'' + action.name + '\')">';
+                                responseHtml += '<i class="' + action.icon + '"></i> ' + action.name;
+                                responseHtml += '</button>';
+                            });
+                            responseHtml += '</div>';
+                        }
+
+                        responseHtml += '<ul class="list-unstyled mt-2">';
+                        metadata.forEach(function (link) {
+                            responseHtml += '<li><a href="' + link.url + '" target="_blank" class="btn btn-sm btn-outline-primary me-2 mb-1">' + link.title + '</a></li>';
+                        });
+                        responseHtml += '</ul></div>';
+
+                        // Show debug info if enabled
+                        if (window.katalysisAIDebugMode) {
+                            responseHtml += displayPageTypesInfo(data);
+                        }
+
+                        responseHtml += '</div></div>';
+                        return responseHtml;
+                    }
+
                     // Function to display page types information
                     function displayPageTypesInfo(data) {
-                        let infoHtml = '<div class="page-types-debug mt-2 p-2 bg-light border rounded">';
+                        let infoHtml = '<div class="debug-info mt-2 p-2 bg-light border rounded">';
 
                         // Page Types Information
                         if (data.page_types_used && data.page_types_used.length > 0) {
@@ -802,13 +1164,124 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             });
                         }
 
+                        // Action IDs Information
+                        if (data.actions && data.actions.length > 0) {
+                            infoHtml += '<hr class="my-2">';
+                            infoHtml += '<small class="text-muted"><strong>Action IDs:</strong></small><br>';
+                            infoHtml += '<small class="text-muted">• Actions suggested: ' + data.actions.length + '</small><br>';
+
+                            data.actions.forEach(function (action, index) {
+                                infoHtml += '<div class="mt-1 p-1 bg-white border rounded">';
+                                infoHtml += '<small class="text-muted"><strong>' + (index + 1) + '. ' + action.name + '</strong> (ID: ' + action.id + ')</small><br>';
+                                infoHtml += '<small class="text-muted">• Icon: ' + action.icon + '</small><br>';
+                                infoHtml += '<small class="text-muted">• Trigger: ' + action.triggerInstruction + '</small><br>';
+                                infoHtml += '<small class="text-muted">• Response: ' + action.responseInstruction + '</small><br>';
+                                infoHtml += '</div>';
+                            });
+                        } else {
+                            infoHtml += '<hr class="my-2">';
+                            infoHtml += '<small class="text-muted"><strong>Action IDs:</strong> None suggested</small><br>';
+                        }
+
                         infoHtml += '</div>';
                         return infoHtml;
+                    }
+
+                    // Display action buttons
+                    function displayActionButtons(actions) {
+                        const actionButtons = document.getElementById('action-buttons');
+                        if (!actionButtons) {
+                            return;
+                        }
+
+                        actionButtons.innerHTML = '';
+
+                        actions.forEach(action => {
+                            const button = document.createElement('button');
+                            button.className = 'action-button btn btn-sm btn-primary me-2 mb-1';
+                            button.innerHTML = `<i class="${action.icon}"></i> ${action.name}`;
+                            button.setAttribute('data-action-id', action.id);
+                            button.setAttribute('data-action-name', action.name);
+                            button.setAttribute('data-response-instruction', action.responseInstruction);
+
+                            button.addEventListener('click', function () {
+                                executeAction(action.id, action.name);
+                            });
+
+                            actionButtons.appendChild(button);
+                        });
+
+                        actionButtons.style.display = 'flex';
+                    }
+
+                    // Hide action buttons
+                    function hideActionButtons() {
+                        const actionButtons = document.getElementById('action-buttons');
+                        if (actionButtons) {
+                            actionButtons.style.display = 'none';
+                            actionButtons.innerHTML = '';
+                        }
+                    }
+
+                    // Execute action
+                    function executeAction(actionId, actionName) {
+
+                        // Hide action buttons
+                        hideActionButtons();
+
+                        // Get conversation context (last few messages)
+                        const messages = document.querySelectorAll('#chat .ai-response, #chat .user-message');
+                        const conversationContext = Array.from(messages)
+                            .slice(-6) // Last 6 messages
+                            .map(msg => msg.textContent || msg.innerText)
+                            .join(' | ');
+
+                        // Execute action
+                        fetch('<?php echo $controller->action('execute_action'); ?>', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '<?php echo $token->generate('ai.settings'); ?>'
+                            },
+                            body: JSON.stringify({
+                                action_id: actionId,
+                                conversation_context: conversationContext
+                            })
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.error) {
+                                    $("#chat").append('<div class="ai-error">Error: ' + data.error + '</div>');
+                                } else {
+                                    $("#chat").append('<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>' + data.content + '</div></div>');
+                                }
+                                saveChatHistory();
+                                scrollToBottom();
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                $("#chat").append('<div class="ai-error">Error executing action: ' + error.message + '</div>');
+                                saveChatHistory();
+                                scrollToBottom();
+                            });
                     }
                 </script>
                 <section>
                     <div class="card border rounded-3 mb-5">
                         <div class="card-body">
+                            <!-- Dynamic AI Header -->
+                            <div class="ai-header mb-3 text-center">
+                                <div class="ai-header-content">
+                                    <i class="fa fa-robot fa-2x text-primary mb-2"></i>
+                                    <h4 id="ai-header-greeting" class="mb-0"><?php echo t('AI Assistant'); ?></h4>
+                                    <p class="text-muted small mb-0"><?php echo t('Powered by AI'); ?></p>
+                                </div>
+                                <!-- Test button for debugging -->
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="testHeaderUpdate()">
+                                    Test Header Update
+                                </button>
+                            </div>
+                            
                             <div id="chat">
                                 <div class="divider d-flex align-items-center mb-4">
                                     <p class="text-center mx-3 mb-0 color-muted">Today</p>
@@ -816,87 +1289,14 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 <div class="ai-response" id="welcome-response" style="display: none;">
                                     <img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp"
                                         alt="Katalysis Bot">
-                                    <div id="welcome-message" class="font-weight-bold">Generating welcome message...</div>
+                                    <div id="welcome-message" class="message-content font-weight-bold">Generating
+                                        welcome message...</div>
                                 </div>
                             </div>
+
                         </div>
 
-                        <div class="suggestions-container bg-primary-subtle d-flex align-items-center overflow-x-auto">
-                            <button type="button" data-bound
-                                class="bg-primary btn-scrolly-rail btn-scrolly-rail--previous animate-fade"
-                                id="collection-2-btn-previous">
-                                <span class="visually-hidden">Scroll previous items into view</span>
-                                <i class="icon fas fa-arrow-left"></i>
-                            </button>
-                            <div class="scrolly-rail-wrapper">
-                                <scrolly-rail data-control-previous="collection-2-btn-previous"
-                                    data-control-next="collection-2-btn-next">
-                                    <div class="collection-list">
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button" onclick="addMessageWithMode('Arrange a meeting')">Arrange
-                                            a
-                                            meeting</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button" onclick="addMessageWithMode('Request a proposal')">Request
-                                            a
-                                            proposal</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button"
-                                            onclick="addMessageWithMode('Arrange a FREE Strategy Session')">Arrange
-                                            a
-                                            FREE Strategy Session</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button"
-                                            onclick="addMessageWithMode('Arrange a Pro LawSite Demo')">Arrange a Pro
-                                            LawSite Demo</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button" onclick="addMessageWithMode('Arrange a meeting')">Arrange
-                                            a
-                                            meeting</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button" onclick="addMessageWithMode('Request a proposal')">Request
-                                            a
-                                            proposal</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button"
-                                            onclick="addMessageWithMode('Arrange a FREE Strategy Session')">Arrange
-                                            a
-                                            FREE Strategy Session</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button"
-                                            onclick="addMessageWithMode('Arrange a Pro LawSite Demo')">Arrange a Pro
-                                            LawSite Demo</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button" onclick="addMessageWithMode('Arrange a meeting')">Arrange
-                                            a
-                                            meeting</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button" onclick="addMessageWithMode('Request a proposal')">Request
-                                            a
-                                            proposal</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button"
-                                            onclick="addMessageWithMode('Arrange a FREE Strategy Session')">Arrange
-                                            a
-                                            FREE Strategy Session</button>
-                                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" dir="auto"
-                                            type="button"
-                                            onclick="addMessageWithMode('Arrange a Pro LawSite Demo')">Arrange a Pro
-                                            LawSite Demo</button>
-                                    </div>
-                                </scrolly-rail>
-                            </div>
-                            <button type="button"
-                                class="bg-primary btn-scrolly-rail btn-scrolly-rail--next animate-fade"
-                                id="collection-2-btn-next">
-                                <span class="visually-hidden">Scroll next items into view</span>
-                                <i class="icon fas fa-arrow-right"></i>
-                                <path
-                                    d="M8.14645 3.14645C8.34171 2.95118 8.65829 2.95118 8.85355 3.14645L12.8536 7.14645c3.0488 7.34171 13.0488 7.65829 12.8536 7.85355L8.85355 11.8536C8.65829 12.0488 8.34171 12.0488 8.14645 11.8536C7.95118 11.6583 7.95118 11.3417 8.14645 11.1464L11.2929 8H2.5C2.22386 8 2 7.77614 2 7.5C2 7.22386 2.22386 7 2.5 7H11.2929L8.14645 3.85355C7.95118 3.65829 7.95118 3.34171 8.14645 3.14645Z"
-                                    fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
-                                </svg>
-                            </button>
-                        </div>
+
 
                         <div
                             class="card-footer bg-dark rounded-bottom-3 text-muted d-flex justify-content-start align-items-center p-3">
@@ -925,12 +1325,12 @@ defined('C5_EXECUTE') or die('Access Denied.');
 
                     <script>
                         window.katalysisAIDebugMode = <?php echo $debugMode ? 'true' : 'false'; ?>;
-                        
+
                         // Default instructions and link selection rules
                         const defaultInstructions = `<?php echo addslashes($defaultInstructions); ?>`;
                         const defaultLinkRules = `<?php echo addslashes($defaultLinkSelectionRules); ?>`;
                         const defaultWelcomePrompt = `<?php echo addslashes($defaultWelcomeMessagePrompt); ?>`;
-                        
+
                         // Function to restore default instructions
                         function restoreDefaultInstructions() {
                             if (confirm('<?php echo t('Are you sure you want to restore the default instructions? This will replace your current instructions.'); ?>')) {
@@ -938,7 +1338,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 updateInstructionsModifiedStatus();
                             }
                         }
-                        
+
                         // Function to restore default link selection rules
                         function restoreDefaultLinkRules() {
                             if (confirm('<?php echo t('Are you sure you want to restore the default link selection rules? This will replace your current rules.'); ?>')) {
@@ -954,12 +1354,27 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 updateWelcomePromptModifiedStatus();
                             }
                         }
-                        
+
+                        // Test function for header update debugging
+                        function testHeaderUpdate() {
+                            console.log('Testing header update...');
+                            const headerGreeting = document.getElementById('ai-header-greeting');
+                            console.log('Header greeting element found:', !!headerGreeting);
+                            if (headerGreeting) {
+                                const testText = 'Test Header Update - ' + new Date().toLocaleTimeString();
+                                console.log('Updating header to:', testText);
+                                headerGreeting.textContent = testText;
+                                console.log('Header updated successfully');
+                            } else {
+                                console.error('Header greeting element not found!');
+                            }
+                        }
+
                         // Function to check if instructions have been modified from default
                         function updateInstructionsModifiedStatus() {
                             const currentInstructions = document.getElementById('instructions').value;
                             const isModified = currentInstructions.trim() !== defaultInstructions.trim();
-                            
+
                             const restoreButton = document.querySelector('button[onclick="restoreDefaultInstructions()"]');
                             if (restoreButton) {
                                 if (isModified) {
@@ -975,12 +1390,12 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 }
                             }
                         }
-                        
+
                         // Function to check if rules have been modified from default
                         function updateRulesModifiedStatus() {
                             const currentRules = document.getElementById('link_selection_rules').value;
                             const isModified = currentRules.trim() !== defaultLinkRules.trim();
-                            
+
                             const restoreButton = document.querySelector('button[onclick="restoreDefaultLinkRules()"]');
                             if (restoreButton) {
                                 if (isModified) {
@@ -1017,16 +1432,23 @@ defined('C5_EXECUTE') or die('Access Denied.');
                                 }
                             }
                         }
-                        
+
                         // Check modification status on page load and when textarea changes
-                        document.addEventListener('DOMContentLoaded', function() {
+                        document.addEventListener('DOMContentLoaded', function () {
+                            // Test if header element exists
+                            const headerGreeting = document.getElementById('ai-header-greeting');
+                            console.log('Page loaded - Header greeting element found:', !!headerGreeting);
+                            if (headerGreeting) {
+                                console.log('Header greeting current text:', headerGreeting.textContent);
+                            }
+                            
                             // Handle instructions textarea
                             const instructionsTextarea = document.getElementById('instructions');
                             if (instructionsTextarea) {
                                 updateInstructionsModifiedStatus();
                                 instructionsTextarea.addEventListener('input', updateInstructionsModifiedStatus);
                             }
-                            
+
                             // Handle link selection rules textarea
                             const rulesTextarea = document.getElementById('link_selection_rules');
                             if (rulesTextarea) {
@@ -1038,9 +1460,147 @@ defined('C5_EXECUTE') or die('Access Denied.');
                             const welcomePromptTextarea = document.getElementById('welcome_message_prompt');
                             if (welcomePromptTextarea) {
                                 updateWelcomePromptModifiedStatus();
-                                welcomePromptTextarea.addEventListener('input', updateWelcomePromptModifiedStatus);
+                                welcomePromptTextarea.addEventListener('input', function () {
+                                    updateWelcomePromptModifiedStatus();
+                                    // Regenerate welcome message when prompt changes
+                                    regenerateWelcomeMessage();
+                                });
                             }
                         });
+
+                        // Test action extraction function
+                        function testActionExtraction() {
+                            const resultsDiv = document.getElementById('actionExtractionResults');
+                            resultsDiv.innerHTML = '<div class="alert alert-info">Testing action extraction...</div>';
+
+                            fetch('<?php echo $controller->action('test_action_extraction'); ?>', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.error) {
+                                        resultsDiv.innerHTML = '<div class="alert alert-danger">Error: ' + data.error + '</div>';
+                                    } else {
+                                        let html = '<div class="alert alert-success">Action extraction test completed successfully!</div>';
+                                        html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+                                        html += '<thead><tr><th>Original Response</th><th>Clean Response</th><th>Extracted Action IDs</th><th>Has Actions</th></tr></thead><tbody>';
+
+                                        data.test_results.forEach(result => {
+                                            html += '<tr>';
+                                            html += '<td><code>' + result.original_response + '</code></td>';
+                                            html += '<td><code>' + result.clean_response + '</code></td>';
+                                            html += '<td><code>' + (result.extracted_action_ids.length > 0 ? result.extracted_action_ids.join(', ') : 'None') + '</code></td>';
+                                            html += '<td><span class="badge ' + (result.has_actions ? 'bg-success' : 'bg-secondary') + '">' + (result.has_actions ? 'Yes' : 'No') + '</span></td>';
+                                            html += '</tr>';
+                                        });
+
+                                        html += '</tbody></table></div>';
+                                        resultsDiv.innerHTML = html;
+                                    }
+                                })
+                                .catch(error => {
+                                    resultsDiv.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+                                });
+                        }
+
+                        // Add event listener for force actions button
+                        document.addEventListener('DOMContentLoaded', function () {
+                            const forceActionsBtn = document.getElementById('testForceActionsBtn');
+                            if (forceActionsBtn) {
+                                console.log('Force actions button found');
+                                forceActionsBtn.addEventListener('click', function () {
+                                    console.log('Force actions button clicked via event listener');
+                                    testForceActions();
+                                });
+                            } else {
+                                console.log('Force actions button not found');
+                            }
+                        });
+
+                        // Test force actions function
+                        function testForceActions() {
+                            console.log('testForceActions function called');
+                            const resultsDiv = document.getElementById('forceActionsResults');
+                            console.log('Results div:', resultsDiv);
+                            resultsDiv.innerHTML = '<div class="alert alert-info">Testing force actions...</div>';
+
+                            fetch('<?php echo $controller->action('test_force_actions'); ?>', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.error) {
+                                        resultsDiv.innerHTML = '<div class="alert alert-danger">Error: ' + data.error + '</div>';
+                                    } else {
+                                        let html = '<div class="alert alert-success">Force action test completed!</div>';
+                                        html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+                                        html += '<thead><tr><th>Test Message</th><th>Original Response</th><th>Clean Response</th><th>Action IDs</th><th>Has Actions</th></tr></thead><tbody>';
+
+                                        html += '<tr>';
+                                        html += '<td><code>' + data.test_message + '</code></td>';
+                                        html += '<td><code>' + data.original_response + '</code></td>';
+                                        html += '<td><code>' + data.clean_response + '</code></td>';
+                                        html += '<td><code>' + (data.extracted_action_ids.length > 0 ? data.extracted_action_ids.join(', ') : 'None') + '</code></td>';
+                                        html += '<td><span class="badge ' + (data.has_actions ? 'bg-success' : 'bg-secondary') + '">' + (data.has_actions ? 'Yes' : 'No') + '</span></td>';
+                                        html += '</tr>';
+
+                                        html += '</tbody></table></div>';
+                                        resultsDiv.innerHTML = html;
+                                    }
+                                })
+                                .catch(error => {
+                                    resultsDiv.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+                                });
+                        }
+
+                        // Test direct AI function
+                        function testDirectAI() {
+                            console.log('testDirectAI function called');
+                            const resultsDiv = document.getElementById('forceActionsResults');
+                            resultsDiv.innerHTML = '<div class="alert alert-info">Testing direct AI...</div>';
+
+                            fetch('<?php echo $controller->action('test_direct_ai'); ?>', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.error) {
+                                        resultsDiv.innerHTML = '<div class="alert alert-danger">Error: ' + data.error + '</div>';
+                                    } else {
+                                        let html = '<div class="alert alert-success">Direct AI test completed!</div>';
+                                        html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+                                        html += '<thead><tr><th>Actions Count</th><th>AI Response</th><th>Clean Response</th><th>Action IDs</th><th>Has Actions</th></tr></thead><tbody>';
+
+                                        html += '<tr>';
+                                        html += '<td>' + data.actions_count + '</td>';
+                                        html += '<td><code style="font-size: 11px;">' + data.ai_response + '</code></td>';
+                                        html += '<td><code style="font-size: 11px;">' + data.clean_response + '</code></td>';
+                                        html += '<td><code>' + (data.extracted_action_ids.length > 0 ? data.extracted_action_ids.join(', ') : 'None') + '</code></td>';
+                                        html += '<td><span class="badge ' + (data.has_actions ? 'bg-success' : 'bg-secondary') + '">' + (data.has_actions ? 'Yes' : 'No') + '</span></td>';
+                                        html += '</tr>';
+
+                                        html += '</tbody></table></div>';
+
+                                        // Also show the direct prompt for debugging
+                                        html += '<div class="mt-3"><h6>Direct Prompt Sent to AI:</h6>';
+                                        html += '<pre class="bg-light p-3 border rounded" style="font-size: 10px; max-height: 200px; overflow-y: auto;">' + data.direct_prompt + '</pre></div>';
+
+                                        resultsDiv.innerHTML = html;
+                                    }
+                                })
+                                .catch(error => {
+                                    resultsDiv.innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
+                                });
+                        }
                     </script>
 
                     <!-- Debug Context Fields -->
@@ -1082,6 +1642,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
                         </div>
 
                     </fieldset>
+
 
                     <script>
                         window.katalysisAIDebugMode = <?php echo $debugMode ? 'true' : 'false'; ?>;

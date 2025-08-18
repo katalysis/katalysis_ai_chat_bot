@@ -15,7 +15,7 @@ defined('C5_EXECUTE') or die('Access Denied.');
 /**
  * @var \Concrete\Core\Routing\Router $router
  * Base path: /ccm/system/search/chats
- * Namespace: Concrete\Package\use KatalysisAiChatBot\Controller\Search\Chats
+ * Namespace: Concrete\Package\KatalysisAiChatBot\Controller\Search\Chats
  */
 
 $router->all('/basic', 'Chats::searchBasic');

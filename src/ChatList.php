@@ -1,12 +1,5 @@
 <?php
 
-/**
- *
- * This file was build with the Entity Designer add-on.
- *
- * https://www.concrete5.org/marketplace/addons/entity-designer
- *
- */
 
 /** @noinspection DuplicatedCode */
 /** @noinspection PhpUnused */
@@ -29,7 +22,7 @@ use Closure;
 class ChatList extends ItemList implements PagerProviderInterface, PaginationProviderInterface
 {
     protected $isFulltextSearch = false;
-    protected $autoSortColumns = ['c.id', 'c.started', 'c.location', 'c.llm'];
+    protected $autoSortColumns = ['c.id', 'c.started', 'c.location', 'c.llm', 'c.Name', 'c.Email', 'c.Phone', 'c.launchPageTitle', 'c.createdDate', 'c.utmSource', 'c.launchPageUrl', 'c.launchPageType', 'c.firstMessage', 'c.lastMessage', 'c.utmId', 'c.utmMedium', 'c.utmCampaign', 'c.utmTerm', 'c.utmContent'];
     protected $permissionsChecker = -1;
     
     public function createQuery()
@@ -48,10 +41,19 @@ class ChatList extends ItemList implements PagerProviderInterface, PaginationPro
      */
     public function filterByKeywords($keywords)
     {
-        $this->query->andWhere('(c.`id` LIKE :keywords OR c.`started` LIKE :keywords OR c.`location` LIKE :keywords OR c.`llm` LIKE :keywords)');
+        $this->query->andWhere('(c.`id` LIKE :keywords OR c.`started` LIKE :keywords OR c.`location` LIKE :keywords OR c.`llm` LIKE :keywords OR c.`Name` LIKE :keywords OR c.`Email` LIKE :keywords OR c.`Phone` LIKE :keywords OR c.`launchPageTitle` LIKE :keywords OR c.`createdDate` LIKE :keywords OR c.`utmSource` LIKE :keywords OR c.`launchPageUrl` LIKE :keywords OR c.`launchPageType` LIKE :keywords OR c.`firstMessage` LIKE :keywords OR c.`lastMessage` LIKE :keywords OR c.`utmId` LIKE :keywords OR c.`utmMedium` LIKE :keywords OR c.`utmCampaign` LIKE :keywords OR c.`utmTerm` LIKE :keywords OR c.`utmContent` LIKE :keywords)');
         $this->query->setParameter('keywords', '%' . $keywords . '%');
     }
     
+    
+    /**
+     * @param string $started
+     */
+    public function filterByStarted($started)
+    {
+        $this->query->andWhere('c.`started` LIKE :started');
+        $this->query->setParameter('started', '%' . $started . '%');
+    }
     
     /**
      * @param string $location
@@ -71,6 +73,140 @@ class ChatList extends ItemList implements PagerProviderInterface, PaginationPro
         $this->query->setParameter('llm', '%' . $llm . '%');
     }
     
+    /**
+     * @param string $name
+     */
+    public function filterByName($name)
+    {
+        $this->query->andWhere('c.`Name` LIKE :name');
+        $this->query->setParameter('name', '%' . $name . '%');
+    }
+    
+    /**
+     * @param string $email
+     */
+    public function filterByEmail($email)
+    {
+        $this->query->andWhere('c.`Email` LIKE :email');
+        $this->query->setParameter('email', '%' . $email . '%');
+    }
+    
+    /**
+     * @param string $phone
+     */
+    public function filterByPhone($phone)
+    {
+        $this->query->andWhere('c.`Phone` LIKE :phone');
+        $this->query->setParameter('phone', '%' . $phone . '%');
+    }
+    
+    /**
+     * @param string $launchPageTitle
+     */
+    public function filterByLaunchPageTitle($launchPageTitle)
+    {
+        $this->query->andWhere('c.`launchPageTitle` LIKE :launchPageTitle');
+        $this->query->setParameter('launchPageTitle', '%' . $launchPageTitle . '%');
+    }
+    
+    /**
+     * @param string $createdDate
+     */
+    public function filterByCreatedDate($createdDate)
+    {
+        $this->query->andWhere('c.`createdDate` LIKE :createdDate');
+        $this->query->setParameter('createdDate', '%' . $createdDate . '%');
+    }
+    
+    /**
+     * @param string $utmSource
+     */
+    public function filterByUtmSource($utmSource)
+    {
+        $this->query->andWhere('c.`utmSource` LIKE :utmSource');
+        $this->query->setParameter('utmSource', '%' . $utmSource . '%');
+    }
+
+    /**
+     * @param string $launchPageUrl
+     */
+    public function filterByLaunchPageUrl($launchPageUrl)
+    {
+        $this->query->andWhere('c.`launchPageUrl` LIKE :launchPageUrl');
+        $this->query->setParameter('launchPageUrl', '%' . $launchPageUrl . '%');
+    }
+
+    /**
+     * @param string $launchPageType
+     */
+    public function filterByLaunchPageType($launchPageType)
+    {
+        $this->query->andWhere('c.`launchPageType` LIKE :launchPageType');
+        $this->query->setParameter('launchPageType', '%' . $launchPageType . '%');
+    }
+
+    /**
+     * @param string $firstMessage
+     */
+    public function filterByFirstMessage($firstMessage)
+    {
+        $this->query->andWhere('c.`firstMessage` LIKE :firstMessage');
+        $this->query->setParameter('firstMessage', '%' . $firstMessage . '%');
+    }
+
+    /**
+     * @param string $lastMessage
+     */
+    public function filterByLastMessage($lastMessage)
+    {
+        $this->query->andWhere('c.`lastMessage` LIKE :lastMessage');
+        $this->query->setParameter('lastMessage', '%' . $lastMessage . '%');
+    }
+
+    /**
+     * @param string $utmId
+     */
+    public function filterByUtmId($utmId)
+    {
+        $this->query->andWhere('c.`utmId` LIKE :utmId');
+        $this->query->setParameter('utmId', '%' . $utmId . '%');
+    }
+
+    /**
+     * @param string $utmMedium
+     */
+    public function filterByUtmMedium($utmMedium)
+    {
+        $this->query->andWhere('c.`utmMedium` LIKE :utmMedium');
+        $this->query->setParameter('utmMedium', '%' . $utmMedium . '%');
+    }
+
+    /**
+     * @param string $utmCampaign
+     */
+    public function filterByUtmCampaign($utmCampaign)
+    {
+        $this->query->andWhere('c.`utmCampaign` LIKE :utmCampaign');
+        $this->query->setParameter('utmCampaign', '%' . $utmCampaign . '%');
+    }
+
+    /**
+     * @param string $utmTerm
+     */
+    public function filterByUtmTerm($utmTerm)
+    {
+        $this->query->andWhere('c.`utmTerm` LIKE :utmTerm');
+        $this->query->setParameter('utmTerm', '%' . $utmTerm . '%');
+    }
+
+    /**
+     * @param string $utmContent
+     */
+    public function filterByUtmContent($utmContent)
+    {
+        $this->query->andWhere('c.`utmContent` LIKE :utmContent');
+        $this->query->setParameter('utmContent', '%' . $utmContent . '%');
+    }
     
     /**
     * @param array $queryRow

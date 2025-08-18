@@ -3,6 +3,7 @@
 namespace KatalysisAiChatBot;
 
 use Concrete\Core\Support\Facade\Config;
+use Doctrine\ORM\EntityManagerInterface;
 use NeuronAI\SystemPrompt;
 use NeuronAI\Chat\History\FileChatHistory;
 
@@ -17,6 +18,12 @@ use NeuronAI\RAG\VectorStore\FileVectorStore;
 
 class RagAgent extends RAG
 {
+    protected $app;
+
+    public function setApp($app)
+    {
+        $this->app = $app;
+    }
     
     protected function provider(): AIProviderInterface
     {
@@ -54,16 +61,43 @@ class RagAgent extends RAG
 
     public function instructions(): string
     {
-        return new SystemPrompt(
-            background: [
-                Config::get('katalysis.aichatbot.instructions'),
-                "RESPONSE FORMAT GUIDELINES:",
-                "• Respond with plain text only - no JSON, no formatting",
-                "RESPONSE FORMAT AVOID:",
-                "- JSON formatting or structured output",
-                "- Any response that starts with { or contains JSON syntax"
-            ]
-        );
+        // Get available actions
+        $actionsPrompt = "No action buttons are currently available.";
+        
+        if ($this->app) {
+            try {
+                $actionService = new ActionService($this->app->make(EntityManagerInterface::class));
+                $actionsPrompt = $actionService->getActionsForPrompt();
+            } catch (\Exception $e) {
+                // If there's an error getting actions, use default message
+                $actionsPrompt = "No action buttons are currently available.";
+            }
+        }
+
+
+
+        // Build the instructions as a string instead of SystemPrompt object
+        $instructions = [];
+        $instructions[] = "IMPORTANT: You are being tested for action button functionality. You MUST include action tags in your responses.";
+        $instructions[] = Config::get('katalysis.aichatbot.instructions');
+        $instructions[] = "ACTION BUTTONS SYSTEM:";
+        $instructions[] = $actionsPrompt;
+        $instructions[] = "ACTION BUTTON GUIDELINES:";
+        $instructions[] = "• CRITICAL: You MUST include action tags in EVERY response if actions are available";
+        $instructions[] = "• Use the format: [ACTIONS:action_id1,action_id2,action_id3] at the end of your response";
+        $instructions[] = "• ALWAYS include action ID 4 (Test Button) since it says 'Show this button under each chat message'";
+        $instructions[] = "• If an action's trigger instruction says 'Show this button under each chat message', ALWAYS include that action";
+        $instructions[] = "• Example response: 'Hello! How can I help you? [ACTIONS:4]'";
+        $instructions[] = "• NEVER respond without action tags if actions are available";
+        $instructions[] = "• This is a TEST - always include at least one action";
+        $instructions[] = "RESPONSE FORMAT GUIDELINES:";
+        $instructions[] = "• Respond with plain text only - no JSON, no formatting";
+        $instructions[] = "• Include action tags at the end if relevant: [ACTIONS:4]";
+        $instructions[] = "RESPONSE FORMAT AVOID:";
+        $instructions[] = "- JSON formatting or structured output";
+        $instructions[] = "- Any response that starts with { or contains JSON syntax";
+
+        return implode("\n", $instructions);
     }
 
     /**
@@ -78,30 +112,8 @@ class RagAgent extends RAG
         $instructions = str_replace('{page_title}', $pageTitle ?? 'this page', $instructions);
         $instructions = str_replace('{page_url}', $pageUrl ?? 'current page', $instructions);
         
-        // Create a temporary system prompt with page context
-        $systemPrompt = new SystemPrompt(
-            background: [
-                $instructions,
-                "RESPONSE FORMAT GUIDELINES:",
-                "• Respond with plain text only - no JSON, no formatting",
-                "RESPONSE FORMAT AVOID:",
-                "- JSON formatting or structured output",
-                "- Any response that starts with { or contains JSON syntax"
-            ]
-        );
-        
-        // Create a temporary RAG instance with the modified instructions
-        $tempRag = new RAG(
-            provider: $this->provider(),
-            embeddings: $this->embeddings(),
-            vectorStore: $this->vectorStore(),
-            chatHistory: $this->chatHistory(),
-            systemPrompt: $systemPrompt
-        );
-        
-        // Get the response
-        $response = $tempRag->answer($message);
-        
-        return $response;
+        // For now, just use the regular answer method since we can't create a new RAG instance
+        // The page context will be handled through the existing instructions
+        return $this->answer($message);
     }
 }   

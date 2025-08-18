@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<schema version="0.3">
+    <table name="btKatalysisAiChatBot">
+        <field name="bID" type="I">
+            <key/>
+            <unsigned/>
+        </field>
+        <field name="title" type="C" size="255"/>
+        <field name="showTitle" type="I1"/>
+        <field name="chatbotPosition" type="C" size="50"/>
+        <field name="theme" type="C" size="20"/>
+    </table>
+</schema> 
