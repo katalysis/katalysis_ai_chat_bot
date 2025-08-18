@@ -20,8 +20,8 @@ class ChatsMenu extends DropdownMenu
         
         $this->addItem(
             new LinkItem(
-                (string)Url::to("/dashboard/katalysis_ai_chat_bot/chats/edit", $chat->getId()),
-                t('Edit')
+                (string)Url::to("/dashboard/katalysis_ai_chat_bot/chats/view_chat", $chat->getId()),
+                t('View')
             )
         );
         

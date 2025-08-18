@@ -174,6 +174,38 @@ class Chats extends DashboardPageController
     }
     
     /**
+     * View a specific chat entry details
+     * @param int $id
+     */
+    public function view_chat($id = null)
+    {
+
+        $this->requireAsset('css', 'katalysis-ai');
+        $this->requireAsset('javascript', 'katalysis-ai');
+        
+        if (!$id) {
+            $this->redirect('/dashboard/katalysis_ai_chat_bot/chats');
+            return;
+        }
+        
+        // Find the chat by ID
+        $chat = $this->entityManager->find(ChatEntity::class, $id);
+        
+        if (!$chat) {
+            $this->error->add(t('Chat not found.'));
+            $this->redirect('/dashboard/katalysis_ai_chat_bot/chats');
+            return;
+        }
+        
+        // Set the chat for the view
+        $this->set('chat', $chat);
+        $this->set('pageTitle', t('View Chat #%s', $chat->getId()));
+        
+        // Render the view
+        $this->render('/dashboard/katalysis_ai_chat_bot/chats/view');
+    }
+    
+    /**
      * @noinspection PhpInconsistentReturnPointsInspection
      */
     public function remove($id = null)

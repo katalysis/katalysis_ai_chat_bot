@@ -40,7 +40,9 @@ class LocationField extends AbstractField
      */
     public function filterList(ItemList $list)
     {
-        $list->filterByLocation(isset($this->data['location']));
+        if (isset($this->data['location']) && $this->data['location'] !== '') {
+            $list->filterByLocation($this->data['location']);
+        }
     }
     
     public function renderSearchField()

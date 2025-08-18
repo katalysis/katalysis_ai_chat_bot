@@ -34,10 +34,52 @@ class ChatBotSettings extends DashboardPageController
         $this->set('welcomeMessagePrompt', $config->get('katalysis.aichatbot.welcome_message_prompt', $this->getDefaultWelcomeMessagePrompt()));
         $this->set('defaultWelcomeMessagePrompt', $this->getDefaultWelcomeMessagePrompt());
         $this->set('essentialWelcomeMessageInstructions', $this->getEssentialWelcomeMessageInstructions());
+        $this->set('contactPageID', $config->get('katalysis.aichatbot.contact_page_id', null));
+        
+        // Get the contact page URL if a page is selected
+        $contactPageUrl = '/contact-us'; // Default fallback
+        if ($config->get('katalysis.aichatbot.contact_page_id')) {
+            try {
+                $contactPage = \Page::getByID($config->get('katalysis.aichatbot.contact_page_id'));
+                if ($contactPage && !$contactPage->isError()) {
+                    $contactPageUrl = $contactPage->getCollectionLink();
+                }
+            } catch (\Exception $e) {
+                // Keep default URL if there's an error
+            }
+        }
+        $this->set('contactPageUrl', $contactPageUrl);
+        
         $this->set('debugMode', (bool) $config->get('katalysis.aichatbot.debug_mode', false));
         $this->set('debugPageTitle', $config->get('katalysis.aichatbot.debug_page_title', ''));
         $this->set('debugPageType', $config->get('katalysis.aichatbot.debug_page_type', ''));
         $this->set('debugPageUrl', $config->get('katalysis.aichatbot.debug_page_url', ''));
+
+        // Debug: Test actions if debug mode is enabled
+        $debugActions = [];
+        if ($config->get('katalysis.aichatbot.debug_mode', false)) {
+            try {
+                $actionService = new \KatalysisAiChatBot\ActionService($this->app->make('Doctrine\ORM\EntityManager'));
+                $actions = $actionService->getAllActions();
+                
+                foreach ($actions as $action) {
+                    $debugActions[] = [
+                        'id' => $action->getId(),
+                        'name' => $action->getName(),
+                        'icon' => $action->getIcon(),
+                        'triggerInstruction' => $action->getTriggerInstruction(),
+                        'responseInstruction' => $action->getResponseInstruction()
+                    ];
+                }
+                
+                // Also get the formatted prompt for debugging
+                $this->set('debugActionsPrompt', $actionService->getActionsForPrompt());
+                
+            } catch (\Exception $e) {
+                $this->set('debugActionsError', $e->getMessage());
+            }
+        }
+        $this->set('debugActions', $debugActions);
 
         // Get available page types
         $pageTypes = \PageType::getList(false);
@@ -66,6 +108,7 @@ class ChatBotSettings extends DashboardPageController
             $config->save('katalysis.aichatbot.instructions', (string) $this->post('instructions'));
             $config->save('katalysis.aichatbot.link_selection_rules', (string) $this->post('link_selection_rules'));
             $config->save('katalysis.aichatbot.welcome_message_prompt', (string) $this->post('welcome_message_prompt'));
+            $config->save('katalysis.aichatbot.contact_page_id', (int) $this->post('contact_page_id'));
             $config->save('katalysis.aichatbot.debug_mode', (bool) $this->post('debug_mode'));
             $config->save('katalysis.aichatbot.debug_page_title', (string) $this->post('debug_page_title'));
             $config->save('katalysis.aichatbot.debug_page_type', (string) $this->post('debug_page_type'));
@@ -155,7 +198,7 @@ EXAMPLES OF INCORRECT RESPONSES:
      */
     private function getDefaultWelcomeMessagePrompt(): string
     {
-        return "Generate a short, friendly welcome message for a legal services website. 
+        return "Generate a short, friendly welcome message for Katalysis, a UK-based web design and development company. 
 
 Context:
 - Time of day: {time_of_day}
@@ -185,9 +228,9 @@ RESPONSE FORMAT REQUIREMENTS:
 • Do not include any meta-commentary about the message
 
 EXAMPLES OF CORRECT RESPONSES:
-- \"Good morning! Welcome to our legal services website. How can we help?\"
+- \"Good morning! Welcome to our website. How can we help?\"
 - \"Good afternoon and welcome to our site. How can we assist you today?\"
-- \"Good evening! Thank you for visiting our legal services. How can we help?\"
+- \"Good evening! Thank you for visiting us. How can we help?\"
 
 EXAMPLES OF INCORRECT RESPONSES:
 - \"Here's a welcome message: Good morning! How can we help?\"
@@ -265,6 +308,7 @@ EXAMPLES OF INCORRECT RESPONSES:
         // Initialize variables
         $message = null;
         $mode = 'rag'; // Default to RAG mode
+        $isNewChat = false; // Track if this is a new chat session
 
         // Get the request object
         $request = $this->app->make('request');
@@ -282,6 +326,7 @@ EXAMPLES OF INCORRECT RESPONSES:
             $jsonData = json_decode($rawContent, true);
             $message = $jsonData['message'] ?? null;
             $mode = $jsonData['mode'] ?? 'rag';
+            $isNewChat = $jsonData['new_chat'] ?? false;
             $pageType = $jsonData['page_type'] ?? null;
             $pageTitle = $jsonData['page_title'] ?? null;
             $pageUrl = $jsonData['page_url'] ?? null;
@@ -290,9 +335,21 @@ EXAMPLES OF INCORRECT RESPONSES:
             $data = $request->request->all();
             $message = $data['message'] ?? null;
             $mode = $data['mode'] ?? 'rag';
+            $isNewChat = $data['new_chat'] ?? false;
             $pageType = $data['page_type'] ?? null;
             $pageTitle = $data['page_title'] ?? null;
             $pageUrl = $data['page_url'] ?? null;
+        }
+
+        // Create new chat record if this is a new chat session
+        $chatId = null;
+        if ($isNewChat) {
+            $chatId = $this->createNewChatRecord($mode, $pageType, $pageTitle, $pageUrl);
+        }
+
+        // Update chat record with message information
+        if ($chatId) {
+            $this->updateChatWithMessage($chatId, $message);
         }
 
         // Get AI configuration
@@ -301,7 +358,6 @@ EXAMPLES OF INCORRECT RESPONSES:
         $openaiModel = $config->get('katalysis.ai.open_ai_model');
         $maxLinksPerResponse = (int) $config->get('katalysis.ai.max_links_per_response', 3);
         $linkSelectionRules = $config->get('katalysis.aichatbot.link_selection_rules', $this->getDefaultLinkSelectionRules());
-
 
         if (!isset($message) || empty($message)) {
             $message = 'Please apologise for not understanding the question';
@@ -319,14 +375,21 @@ EXAMPLES OF INCORRECT RESPONSES:
             if ($mode === 'rag') {
                 // RAG Mode: Use RagAgent with its instructions
                 $ragAgent = new RagAgent();
+                $ragAgent->setApp($this->app);
 
-                // Get the response using page context if available
-                if ($pageType || $pageTitle || $pageUrl) {
-                    $response = $ragAgent->answerWithPageContext(new UserMessage($message), $pageType, $pageTitle, $pageUrl);
-                } else {
-                    $response = $ragAgent->answer(new UserMessage($message));
+                try {
+                    // Get the response using page context if available
+                    if ($pageType || $pageTitle || $pageUrl) {
+                        $response = $ragAgent->answerWithPageContext(new UserMessage($message), $pageType, $pageTitle, $pageUrl);
+                    } else {
+                        $response = $ragAgent->answer(new UserMessage($message));
+                    }
+                    $responseContent = $response->getContent();
+                } catch (\Exception $e) {
+                    \Log::addError('RAG agent failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+                    throw new \Exception('RAG processing failed: ' . $e->getMessage());
                 }
-                $responseContent = $response->getContent();
+
 
                 // Handle case where AI returns JSON instead of plain text
                 if (strpos($responseContent, '{') === 0 && strpos($responseContent, '}') !== false) {
@@ -340,8 +403,23 @@ EXAMPLES OF INCORRECT RESPONSES:
                     }
                 }
 
+                // Extract action IDs from response
+                $actionIds = [];
+                if (preg_match('/\[ACTIONS:([^\]]+)\]/', $responseContent, $matches)) {
+                    $actionIds = array_map('intval', explode(',', $matches[1]));
+                    // Remove the action tag from the response content
+                    $responseContent = preg_replace('/\[ACTIONS:[^\]]+\]/', '', $responseContent);
+                    $responseContent = trim($responseContent);
+                }
+
                 // Get relevant documents for metadata links using the parent class method
-                $relevantDocs = $ragAgent->retrieveDocuments(new UserMessage($message));
+                try {
+                    $relevantDocs = $ragAgent->retrieveDocuments(new UserMessage($message));
+                } catch (\Exception $e) {
+                    \Log::addError('Document retrieval failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+                    // Continue without documents rather than failing completely
+                    $relevantDocs = [];
+                }
 
                 // Track page types used in the response
                 $pageTypesUsed = [];
@@ -397,7 +475,7 @@ EXAMPLES OF INCORRECT RESPONSES:
                     $maxCandidates = min(count($candidateDocs), 15);
                     $candidateDocs = array_slice($candidateDocs, 0, $maxCandidates);
 
-                                        // Create a prompt for AI to select the most relevant links
+                    // Create a prompt for AI to select the most relevant links
                     $linkSelectionPrompt = "You are helping to select the most relevant links for a user's question. 
 
 User Question: \"{$message}\"
@@ -488,7 +566,7 @@ Available documents (with titles and URLs):
                 }
 
                 // Return response with metadata and page types used
-                return new JsonResponse([
+                $responseData = [
                     'content' => $responseContent,
                     'metadata' => $metadata,
                     'page_types_used' => $pageTypesUsed,
@@ -520,28 +598,153 @@ Available documents (with titles and URLs):
                             ];
                         }, $metadata)
                     ]
-                ]);
+                ];
+
+                // Add actions if any were suggested by the AI
+                if (!empty($actionIds)) {
+                    $actionService = new \KatalysisAiChatBot\ActionService($this->app->make('Doctrine\ORM\EntityManager'));
+                    $suggestedActions = [];
+                    
+                    foreach ($actionIds as $actionId) {
+                        $action = $actionService->getActionById($actionId);
+                        if ($action) {
+                            $suggestedActions[] = [
+                                'id' => $action->getId(),
+                                'name' => $action->getName(),
+                                'icon' => $action->getIcon(),
+                                'triggerInstruction' => $action->getTriggerInstruction(),
+                                'responseInstruction' => $action->getResponseInstruction()
+                            ];
+                        }
+                    }
+                    
+                    $responseData['actions'] = $suggestedActions;
+                }
+
+                // Add chat ID if a new chat was created
+                if ($chatId) {
+                    $responseData['chat_id'] = $chatId;
+                }
+
+                return new JsonResponse($responseData);
 
             } else {
-                // Basic Mode: Use regular AiAgent
-                $agent = new AiAgent();
-                $response = $agent->chat(
-                    new UserMessage($message)
-                );
+                // Basic Mode: Use regular AiAgent or direct AI call for welcome messages
+                if (strpos($message, 'Generate a short, friendly welcome message') !== false) {
+                    // This is a welcome message request - use direct AI call with the welcome prompt
+                    $aiProvider = new \NeuronAI\Providers\OpenAI\OpenAI(
+                        key: $openaiKey,
+                        model: $openaiModel
+                    );
 
-                $responseContent = $response->getContent();
+                    $response = $aiProvider->chat([
+                        new \NeuronAI\Chat\Messages\UserMessage($message)
+                    ]);
 
-                return new JsonResponse([
+                    $responseContent = $response->getContent();
+                } else {
+                    // Regular basic mode - use AiAgent
+                    $agent = new AiAgent();
+                    $response = $agent->chat(
+                        new UserMessage($message)
+                    );
+
+                    $responseContent = $response->getContent();
+                }
+
+                $responseData = [
                     'content' => $responseContent,
                     'metadata' => []
-                ]);
+                ];
+
+                // Add chat ID if a new chat was created
+                if ($chatId) {
+                    $responseData['chat_id'] = $chatId;
+                }
+
+                return new JsonResponse($responseData);
             }
 
         } catch (\Exception $e) {
-            return new JsonResponse(
-                ['error' => 'Failed to process request: ' . $e->getMessage()],
-                500
+            // Log the specific error for debugging
+            \Log::addError('AI request failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            
+            // Return more specific error information
+            return new JsonResponse([
+                'error' => 'AI processing failed',
+                'details' => $e->getMessage(),
+                'type' => get_class($e)
+            ], 500);
+        }
+    }
+
+    /**
+     * Handle action button clicks
+     */
+    public function execute_action()
+    {
+        // No token validation needed (like ask_ai method)
+
+        // Get request data
+        $request = $this->app->make('request');
+        
+        // Parse JSON request body
+        $rawContent = $request->getContent();
+        $jsonData = json_decode($rawContent, true);
+        
+        $actionId = $jsonData['action_id'] ?? null;
+        $conversationContext = $jsonData['conversation_context'] ?? '';
+
+        if (!$actionId) {
+            return new JsonResponse(['error' => 'Action ID is required'], 400);
+        }
+
+        try {
+            // Get the action
+            $actionService = new \KatalysisAiChatBot\ActionService($this->app->make('Doctrine\ORM\EntityManager'));
+            $action = $actionService->getActionById($actionId);
+
+            if (!$action) {
+                return new JsonResponse(['error' => 'Action not found'], 404);
+            }
+
+            // Get AI configuration
+            $config = $this->app->make('config');
+            $openaiKey = $config->get('katalysis.ai.open_ai_key');
+            $openaiModel = $config->get('katalysis.ai.open_ai_model');
+
+            if (empty($openaiKey) || empty($openaiModel)) {
+                return new JsonResponse(['error' => 'AI configuration is incomplete'], 400);
+            }
+
+            // Create a prompt for the AI to execute the action
+            $prompt = "The user has clicked the '{$action->getName()}' action button. ";
+            $prompt .= "Here is the instruction for what to do: {$action->getResponseInstruction()}";
+            
+            if (!empty($conversationContext)) {
+                $prompt .= "\n\nConversation context: {$conversationContext}";
+            }
+
+            // Execute the action using AI
+            $aiProvider = new \NeuronAI\Providers\OpenAI\OpenAI(
+                key: $openaiKey,
+                model: $openaiModel
             );
+
+            $response = $aiProvider->chat([
+                new \NeuronAI\Chat\Messages\UserMessage($prompt)
+            ]);
+
+            $responseContent = $response->getContent();
+
+            return new JsonResponse([
+                'content' => $responseContent,
+                'action_name' => $action->getName(),
+                'action_icon' => $action->getIcon()
+            ]);
+
+        } catch (\Exception $e) {
+            return new JsonResponse(['error' => 'Failed to execute action: ' . $e->getMessage()], 500);
         }
     }
 
@@ -549,4 +752,341 @@ Available documents (with titles and URLs):
 
 
 
+
+
+    /**
+     * Create a new chat record in the database
+     */
+    private function createNewChatRecord(string $mode, ?string $pageType, ?string $pageTitle, ?string $pageUrl): ?int
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            
+            $chat = new \KatalysisAiChatBot\Entity\Chat();
+            
+            // Set chat properties
+            $chat->setStarted(new \DateTime());
+            $chat->setCreatedDate(new \DateTime());
+            
+            // Get user's geographical location from IP address
+            $location = $this->getUserGeographicalLocation();
+            $chat->setLocation($location);
+            
+            // Get the actual chat model being used
+            $config = $this->app->make('config');
+            $chatModel = $config->get('katalysis.ai.open_ai_model', 'gpt-4');
+            $chat->setLlm($chatModel);
+            
+            // Get current page information from Concrete CMS
+            $currentPage = \Page::getCurrentPage();
+            if ($currentPage && !$currentPage->isError()) {
+                $chat->setLaunchPageUrl($currentPage->getCollectionLink());
+                $chat->setLaunchPageType($currentPage->getPageTypeHandle());
+                $chat->setLaunchPageTitle($currentPage->getCollectionName());
+            } else {
+                // Fallback to provided values if current page is not available
+                $chat->setLaunchPageUrl($pageUrl ?: '');
+                $chat->setLaunchPageType($pageType ?: '');
+                $chat->setLaunchPageTitle($pageTitle ?: '');
+            }
+            
+            // Set UTM parameters from request
+            $request = $this->app->make('request');
+            $chat->setUtmId($request->get('utm_id', ''));
+            $chat->setUtmSource($request->get('utm_source', ''));
+            $chat->setUtmMedium($request->get('utm_medium', ''));
+            $chat->setUtmCampaign($request->get('utm_campaign', ''));
+            $chat->setUtmTerm($request->get('utm_term', ''));
+            $chat->setUtmContent($request->get('utm_content', ''));
+            
+            // Set created by (current user or null if not logged in)
+            $user = new \Concrete\Core\User\User();
+            if ($user && $user->isRegistered()) {
+                $chat->setCreatedBy($user->getUserID());
+            }
+            
+            // Persist the chat record
+            $entityManager->persist($chat);
+            $entityManager->flush();
+            
+            return $chat->getId();
+            
+        } catch (\Exception $e) {
+            // Log the error but don't fail the chat request
+            \Log::addError('Failed to create chat record: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get user's geographical location from IP address
+     */
+    private function getUserGeographicalLocation(): string
+    {
+        try {
+            $request = $this->app->make('request');
+            $ip = $request->getClientIp();
+            
+            // Skip local/private IPs
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return 'Local/Private IP';
+            }
+            
+            // Use a free IP geolocation service
+            $url = "http://ip-api.com/json/{$ip}?fields=status,message,country,regionName,city";
+            $response = file_get_contents($url);
+            
+            if ($response !== false) {
+                $data = json_decode($response, true);
+                
+                if ($data && isset($data['status']) && $data['status'] === 'success') {
+                    $location = [];
+                    
+                    if (!empty($data['city'])) {
+                        $location[] = $data['city'];
+                    }
+                    if (!empty($data['regionName'])) {
+                        $location[] = $data['regionName'];
+                    }
+                    if (!empty($data['country'])) {
+                        $location[] = $data['country'];
+                    }
+                    
+                    return !empty($location) ? implode(', ', $location) : 'Unknown Location';
+                }
+            }
+            
+            return 'Location Unknown';
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to get user location: ' . $e->getMessage());
+            return 'Location Error';
+        }
+    }
+
+    /**
+     * Update chat record with message information
+     */
+    private function updateChatWithMessage(int $chatId, string $message): void
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
+            
+            if ($chat) {
+                // Set first message if not already set
+                if (empty($chat->getFirstMessage())) {
+                    $chat->setFirstMessage($message);
+                }
+                
+                // Always update last message
+                $chat->setLastMessage($message);
+                
+                $entityManager->persist($chat);
+                $entityManager->flush();
+            }
+            
+        } catch (\Exception $e) {
+            // Log the error but don't fail the chat request
+            \Log::addError('Failed to update chat with message: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update chat record with complete chat history
+     */
+    private function updateChatWithCompleteHistory(int $chatId, array $messages): void
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
+            
+            if ($chat) {
+                // Convert messages to JSON for storage
+                $chatHistoryJson = json_encode($messages, JSON_PRETTY_PRINT);
+                
+                // Update the complete chat history
+                $chat->setCompleteChatHistory($chatHistoryJson);
+                
+                $entityManager->persist($chat);
+                $entityManager->flush();
+            }
+            
+        } catch (\Exception $e) {
+            // Log the error but don't fail the chat request
+            \Log::addError('Failed to update chat with complete history: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Log chat from chatbot block to database
+     */
+    public function log_chat()
+    {
+        try {
+            $request = $this->app->make('request');
+            $data = json_decode($request->getContent(), true);
+            
+            if (!$data) {
+                return new \Symfony\Component\HttpFoundation\JsonResponse([
+                    'success' => false,
+                    'error' => 'Invalid request data'
+                ]);
+            }
+            
+            $chatbotId = $data['chatbot_id'] ?? '';
+            $pageTitle = $data['page_title'] ?? '';
+            $pageUrl = $data['page_url'] ?? '';
+            $pageType = $data['page_type'] ?? '';
+            $messages = $data['messages'] ?? [];
+            $timestamp = $data['timestamp'] ?? time();
+            $sessionId = $data['session_id'] ?? '';
+            
+            if (empty($messages)) {
+                return new \Symfony\Component\HttpFoundation\JsonResponse([
+                    'success' => false,
+                    'error' => 'No messages to log'
+                ]);
+            }
+            
+            // Create or update chat record
+            $chatId = $this->createOrUpdateChatRecord($chatbotId, $pageTitle, $pageUrl, $pageType, $sessionId);
+            
+            if ($chatId) {
+                // Log individual messages
+                $this->logChatMessages($chatId, $messages);
+                
+                return new \Symfony\Component\HttpFoundation\JsonResponse([
+                    'success' => true,
+                    'message' => 'Chat logged successfully. Chat ID: ' . $chatId,
+                    'chat_id' => $chatId
+                ]);
+            } else {
+                return new \Symfony\Component\HttpFoundation\JsonResponse([
+                    'success' => false,
+                    'error' => 'Failed to create chat record'
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to log chat: ' . $e->getMessage());
+            return new \Symfony\Component\HttpFoundation\JsonResponse([
+                'success' => false,
+                'error' => 'Failed to log chat: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Update existing chat record in database
+     */
+    public function update_chat()
+    {
+        try {
+            $request = $this->app->make('request');
+            $data = json_decode($request->getContent(), true);
+            
+            if (!$data) {
+                return new \Symfony\Component\HttpFoundation\JsonResponse([
+                    'success' => false,
+                    'error' => 'Invalid request data'
+                ]);
+            }
+            
+            $chatId = $data['chat_id'] ?? 0;
+            $messages = $data['messages'] ?? [];
+            
+            if (empty($chatId)) {
+                return new \Symfony\Component\HttpFoundation\JsonResponse([
+                    'success' => false,
+                    'error' => 'No chat ID provided'
+                ]);
+            }
+            
+            // Update the existing chat record with new messages
+            $this->logChatMessages($chatId, $messages);
+            
+            return new \Symfony\Component\HttpFoundation\JsonResponse([
+                'success' => true,
+                'message' => 'Chat updated successfully'
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to update chat: ' . $e->getMessage());
+            return new \Symfony\Component\HttpFoundation\JsonResponse([
+                'success' => false,
+                'error' => 'Failed to update chat: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Create or update chat record for chatbot block
+     */
+    private function createOrUpdateChatRecord(string $chatbotId, string $pageTitle, string $pageUrl, string $pageType, string $sessionId = ''): ?int
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            
+            // Always create a new chat record for each session
+            // This ensures that clearing chat history creates a new database record
+            $chat = new \KatalysisAiChatBot\Entity\Chat();
+            
+            // Set chat record properties
+            $chat->setStarted(new \DateTime());
+            $chat->setLocation($this->getUserGeographicalLocation());
+            $chat->setLlm('gpt-4');
+            $chat->setLaunchPageTitle($pageTitle);
+            $chat->setLaunchPageUrl($pageUrl);
+            $chat->setLaunchPageType($pageType);
+            $chat->setCreatedDate(new \DateTime());
+            $chat->setUtmSource('chatbot_block');
+            $chat->setUtmMedium('chatbot');
+            $chat->setUtmCampaign('website_chat');
+            $chat->setUtmTerm($chatbotId);
+            $chat->setUtmContent('block_chat');
+            $chat->setSessionId($sessionId);
+            
+            // Set created by (current user or null if not logged in)
+            $user = new \Concrete\Core\User\User();
+            if ($user && $user->isRegistered()) {
+                $chat->setCreatedBy($user->getUserID());
+            }
+            
+            // Persist the chat record
+            $entityManager->persist($chat);
+            $entityManager->flush();
+            
+            return $chat->getId();
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to create/update chat record: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Log individual chat messages
+     */
+    private function logChatMessages(int $chatId, array $messages): void
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
+            
+            if ($chat) {
+                // Update chat with last message
+                $lastMessage = end($messages);
+                if ($lastMessage && isset($lastMessage['content'])) {
+                    $this->updateChatWithMessage($chatId, $lastMessage['content']);
+                }
+                
+                // Store complete chat history
+                $this->updateChatWithCompleteHistory($chatId, $messages);
+            }
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to log chat messages: ' . $e->getMessage());
+        }
+    }
 }

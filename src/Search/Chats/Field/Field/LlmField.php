@@ -40,7 +40,9 @@ class LlmField extends AbstractField
      */
     public function filterList(ItemList $list)
     {
-        $list->filterByLlm(isset($this->data['llm']));
+        if (isset($this->data['llm']) && $this->data['llm'] !== '') {
+            $list->filterByLlm($this->data['llm']);
+        }
     }
     
     public function renderSearchField()

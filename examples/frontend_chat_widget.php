@@ -1,9 +1,10 @@
 <?php
 /**
- * Example: Frontend Chat Widget with Page Type Context
+ * Example: Frontend Chat Widget with Page Type Context and Action Buttons
  * 
  * This example shows how to implement a chat widget that automatically
  * detects the current page context and passes it to the AI system.
+ * It also displays action buttons when suggested by the AI.
  */
 
 // Get current page information
@@ -25,6 +26,9 @@ $token = $this->app->make('token');
     
     <div id="chat-container" class="chat-container" style="display: none;">
         <div id="chat-messages" class="chat-messages"></div>
+        
+        <!-- Action Buttons Container -->
+        <div id="action-buttons" class="action-buttons" style="display: none;"></div>
         
         <div class="chat-input">
             <input type="text" id="chat-input" placeholder="Type your message..." />
@@ -53,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
     const chatSend = document.getElementById('chat-send');
+    const actionButtons = document.getElementById('action-buttons');
     
     // Toggle chat visibility
     chatToggle.addEventListener('click', function() {
@@ -76,6 +81,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add user message to chat
         addMessage('user', message);
         chatInput.value = '';
+        
+        // Hide any existing action buttons
+        hideActionButtons();
         
         // Show loading indicator
         addMessage('ai', 'Thinking...', 'loading');
@@ -109,6 +117,17 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 addMessage('ai', data.content);
                 
+                // Debug: Log the response data
+                console.log('AI Response Data:', data);
+                
+                // Display action buttons if provided
+                if (data.actions && data.actions.length > 0) {
+                    console.log('Found actions:', data.actions);
+                    displayActionButtons(data.actions);
+                } else {
+                    console.log('No actions found in response');
+                }
+                
                 // Add "More Info" links if available
                 if (data.metadata && data.metadata.length > 0) {
                     let linksHtml = '<div class="more-info"><strong>More Information:</strong><ul>';
@@ -130,6 +149,100 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             addMessage('ai', 'Sorry, I encountered an error. Please try again.');
+        });
+    }
+    
+    // Display action buttons
+    function displayActionButtons(actions) {
+        console.log('displayActionButtons called with:', actions);
+        actionButtons.innerHTML = '';
+        
+        actions.forEach(action => {
+            console.log('Creating button for action:', action);
+            const button = document.createElement('button');
+            button.className = 'action-button';
+            button.innerHTML = `<i class="${action.icon}"></i> ${action.name}`;
+            button.setAttribute('data-action-id', action.id);
+            button.setAttribute('data-action-name', action.name);
+            button.setAttribute('data-response-instruction', action.responseInstruction);
+            
+            button.addEventListener('click', function() {
+                executeAction(action.id, action.name);
+            });
+            
+            actionButtons.appendChild(button);
+        });
+        
+        console.log('Setting actionButtons display to flex');
+        actionButtons.style.display = 'flex';
+        
+        // Add a debug indicator
+        const debugDiv = document.createElement('div');
+        debugDiv.style.cssText = 'background: yellow; padding: 5px; margin: 5px; font-size: 12px; border: 1px solid red;';
+        debugDiv.textContent = `DEBUG: ${actions.length} action(s) displayed`;
+        actionButtons.appendChild(debugDiv);
+    }
+    
+    // Hide action buttons
+    function hideActionButtons() {
+        actionButtons.style.display = 'none';
+        actionButtons.innerHTML = '';
+    }
+    
+    // Execute action
+    function executeAction(actionId, actionName) {
+        // Add action click message
+        addMessage('user', `Clicked: ${actionName}`, 'action-click');
+        
+        // Hide action buttons
+        hideActionButtons();
+        
+        // Show loading indicator
+        addMessage('ai', 'Processing...', 'loading');
+        
+        // Get conversation context (last few messages)
+        const messages = chatMessages.querySelectorAll('.chat-message');
+        const conversationContext = Array.from(messages)
+            .slice(-6) // Last 6 messages
+            .map(msg => msg.textContent)
+            .join(' | ');
+        
+        // Execute action
+        fetch('/dashboard/katalysis_ai_chat_bot/chat_bot_settings/execute_action', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '<?php echo $token->generate('ai.settings'); ?>'
+            },
+            body: JSON.stringify({
+                action_id: actionId,
+                conversation_context: conversationContext
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading message
+            const loadingMessage = chatMessages.querySelector('.loading');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+            
+            if (data.error) {
+                addMessage('ai', 'Sorry, I encountered an error executing that action. Please try again.');
+            } else {
+                addMessage('ai', data.content);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Remove loading message
+            const loadingMessage = chatMessages.querySelector('.loading');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+            
+            addMessage('ai', 'Sorry, I encountered an error executing that action. Please try again.');
         });
     }
     
@@ -188,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
     flex: 1;
     padding: 15px;
     overflow-y: auto;
-    max-height: 300px;
+    max-height: 200px;
 }
 
 .chat-message {
@@ -214,6 +327,12 @@ document.addEventListener('DOMContentLoaded', function() {
     color: #6c757d;
 }
 
+.action-click {
+    background: #28a745 !important;
+    color: white;
+    font-style: italic;
+}
+
 .links ul {
     margin: 5px 0;
     padding-left: 20px;
@@ -226,6 +345,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .links a:hover {
     text-decoration: underline;
+}
+
+.action-buttons {
+    padding: 10px 15px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: #f8f9fa;
+    min-height: 20px;
+}
+
+.action-button {
+    padding: 8px 16px;
+    background: #28a745;
+    color: white;
+    border: 2px solid #1e7e34;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.2s;
+    margin: 2px;
+}
+
+.action-button:hover {
+    background: #0056b3;
+}
+
+.action-button i {
+    font-size: 14px;
 }
 
 .chat-input {
@@ -254,17 +407,14 @@ document.addEventListener('DOMContentLoaded', function() {
  * 1. Include this file in your page template or view
  * 2. The widget will automatically detect the current page context
  * 3. When users chat, the AI will receive page type, title, and URL
- * 4. Configure your AI instructions in the dashboard to use the placeholders:
- *    - {page_type} - Current page type handle
- *    - {page_title} - Current page title
- *    - {page_url} - Current page URL
+ * 4. The AI can suggest action buttons based on the conversation
+ * 5. Action buttons will appear below the chat messages
+ * 6. When clicked, actions execute their response instructions
  * 
- * Example Instructions for Location Pages:
- * "If the page type is 'location', mention that we are based in your local area 
- *  and can provide on-site services. Always include local contact information."
- * 
- * Example Instructions for Service Pages:
- * "If the page type is 'service', focus on the specific service mentioned in 
- *  {page_title} and provide detailed information about our expertise in this area."
+ * Action Button Features:
+ * - Displayed when AI suggests them using [ACTIONS:1,2,3] format
+ * - Show icon and name from the action configuration
+ * - Execute response instructions when clicked
+ * - Include conversation context for better responses
  */
 ?> 

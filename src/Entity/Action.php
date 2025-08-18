@@ -1,0 +1,192 @@
+<?php
+
+/** @noinspection DuplicatedCode */
+/** @noinspection PhpUnnecessaryFullyQualifiedNameInspection */
+/** @noinspection PhpFullyQualifiedNameUsageInspection */
+
+namespace KatalysisAiChatBot\Entity;
+
+use Doctrine\ORM\Mapping as ORM;
+
+/**
+ * @ORM\Entity
+ * @ORM\Table(name="`KatalysisActions`")
+ */
+class Action
+{
+    /**
+     * @var integer
+     * @ORM\Id
+     * @ORM\GeneratedValue(strategy="AUTO")
+     * @ORM\Column(name="`id`", type="integer", nullable=true)
+     */
+    protected $id;
+
+    /**
+     * @var string
+     * @ORM\Column(name="`name`", type="string", nullable=true)
+     */
+    protected $name = '';
+
+    /**
+     * @var string
+     * @ORM\Column(name="`icon`", type="string", nullable=true)
+     */
+    protected $icon = '';
+
+    /**
+     * @var string
+     * @ORM\Column(name="`triggerInstruction`", type="text", nullable=true)
+     */
+    protected $triggerInstruction = '';
+
+    /**
+     * @var string
+     * @ORM\Column(name="`responseInstruction`", type="text", nullable=true)
+     */
+    protected $responseInstruction = '';
+
+    /**
+     * @var integer
+     * @ORM\Column(name="`createdBy`", type="integer", nullable=true)
+     */
+    protected $createdBy;
+
+    /**
+     * @var datetime
+     * @ORM\Column(name="`createdDate`", type="datetime", nullable=true)
+     */
+    protected $createdDate;
+
+    
+    /**
+     * @return integer
+     */
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    /**
+     * @return string
+     */
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    /**
+     * @return string
+     */
+    public function getIcon()
+    {
+        return $this->icon;
+    }
+
+    /**
+     * @return string
+     */
+    public function getTriggerInstruction()
+    {
+        return $this->triggerInstruction;
+    }
+
+    /**
+     * @return string
+     */
+    public function getResponseInstruction()
+    {
+        return $this->responseInstruction;
+    }
+
+    /**
+     * @return integer
+     */
+    public function getCreatedBy()
+    {
+        return $this->createdBy;
+    }
+
+    /**
+     * @return datetime
+     */
+    public function getCreatedDate()
+    {
+        return $this->createdDate;
+    }
+
+    
+    /**
+     * @param integer $id
+     * @return Action
+     */
+    public function setId($id)
+    {
+        $this->id = $id;
+         return $this;
+    }
+
+    /**
+     * @param string $name
+     * @return Action
+     */
+    public function setName($name)
+    {
+        $this->name = $name;
+         return $this;
+    }
+
+    /**
+     * @param string $icon
+     * @return Action
+     */
+    public function setIcon($icon)
+    {
+        $this->icon = $icon;
+         return $this;
+    }
+
+    /**
+     * @param string $triggerInstruction
+     * @return Action
+     */
+    public function setTriggerInstruction($triggerInstruction)
+    {
+        $this->triggerInstruction = $triggerInstruction;
+         return $this;
+    }
+
+    /**
+     * @param string $responseInstruction
+     * @return Action
+     */
+    public function setResponseInstruction($responseInstruction)
+    {
+        $this->responseInstruction = $responseInstruction;
+         return $this;
+    }
+
+    /**
+     * @param integer $createdBy
+     * @return Action
+     */
+    public function setCreatedBy($createdBy)
+    {
+        $this->createdBy = $createdBy;
+         return $this;
+    }
+
+    /**
+     * @param datetime $createdDate
+     * @return Action
+     */
+    public function setCreatedDate($createdDate)
+    {
+        $this->createdDate = $createdDate;
+         return $this;
+    }
+
+    
+
+    
+}
