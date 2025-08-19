@@ -149,6 +149,12 @@ class Chat
      * @ORM\Column(name="`sessionId`", type="string", nullable=true)
      */
     protected $sessionId = '';
+
+    /**
+     * @var integer
+     * @ORM\Column(name="`userMessageCount`", type="integer", nullable=true)
+     */
+    protected $userMessageCount = 0;
     
     
     /**
@@ -253,6 +259,14 @@ class Chat
     public function getSessionId()
     {
         return $this->sessionId;
+    }
+
+    /**
+     * @return integer
+     */
+    public function getUserMessageCount()
+    {
+        return $this->userMessageCount;
     }
 
     /**
@@ -455,6 +469,16 @@ class Chat
     public function setSessionId($sessionId)
     {
         $this->sessionId = $sessionId;
+         return $this;
+    }
+
+    /**
+     * @param integer $userMessageCount
+     * @return Chat
+     */
+    public function setUserMessageCount($userMessageCount)
+    {
+        $this->userMessageCount = $userMessageCount;
          return $this;
     }
 

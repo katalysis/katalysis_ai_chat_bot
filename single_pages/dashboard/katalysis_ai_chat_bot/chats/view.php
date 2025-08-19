@@ -48,6 +48,13 @@ defined('C5_EXECUTE') or die("Access Denied.");
                             <th style="width:40%;"><?php echo t('LLM'); ?></th>
                             <td><?php echo $chat->getLlm() ?: t('Not set'); ?></td>
                         </tr>
+                        <tr>
+                            <th style="width:40%;"><?php echo t('User Message Count'); ?></th>
+                            <td>
+                                <span class="badge bg-primary"><?php echo $chat->getUserMessageCount() ?: '0'; ?></span>
+                                <small class="text-muted ms-2"><?php echo t('engagement metric'); ?></small>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
                 <h4><?php echo t('Page Information'); ?></h4>

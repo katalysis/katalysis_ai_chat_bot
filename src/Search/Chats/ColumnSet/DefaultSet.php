@@ -18,6 +18,7 @@ use KatalysisAiChatBot\Search\Chats\ColumnSet\Column\FirstMessageColumn;
 use KatalysisAiChatBot\Search\Chats\ColumnSet\Column\LastMessageColumn;
 use KatalysisAiChatBot\Search\Chats\ColumnSet\Column\LocationColumn;
 use KatalysisAiChatBot\Search\Chats\ColumnSet\Column\LlmColumn;
+use KatalysisAiChatBot\Search\Chats\ColumnSet\Column\UserMessageCountColumn;
 
 
 class DefaultSet extends ColumnSet
@@ -32,6 +33,7 @@ class DefaultSet extends ColumnSet
         $this->addColumn(new LastMessageColumn());
         $this->addColumn(new LocationColumn());
         $this->addColumn(new LlmColumn());
+        $this->addColumn(new UserMessageCountColumn());
         $id = $this->getColumnByKey('c.id');
         $this->setDefaultSortColumn($id, 'desc');
     }

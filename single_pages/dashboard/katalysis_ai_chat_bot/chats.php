@@ -1,13 +1,13 @@
 <?php
 
-defined('C5_EXECUTE') or die('Access denied');
+defined('C5_EXECUTE') or die('Access denied.');
 
 \Log::info("chats.php");
 
 /** @noinspection DuplicatedCode */
 
 use Concrete\Core\Application\UserInterface\ContextMenu\MenuInterface;
-use Concrete\Core\Support\Facade\Url;
+use Concrete\Core\Support\Facade\URL;
 use KatalysisAiChatBot\Entity\Chat;    
 use KatalysisAiChatBot\Search\Chats\Result\Column;
 use KatalysisAiChatBot\Search\Chats\Result\Item;
@@ -15,10 +15,14 @@ use KatalysisAiChatBot\Search\Chats\Result\ItemColumn;
 use KatalysisAiChatBot\Search\Chats\Result\Result;
 use KatalysisAiChatBot\Search\Chats\Result\Menu;
 use KatalysisAiChatBot\ChatsMenu;
+use KatalysisAiChatBot\Search\Chats\Menu\MenuFactory;
 
 /** @var string|null $class */
 /** @var MenuInterface $menu */
 /** @var Result $result */
+
+// Create the bulk actions menu
+$bulkMenu = (new MenuFactory())->createBulkMenu();
 
 ?>
 
@@ -45,6 +49,8 @@ use KatalysisAiChatBot\ChatsMenu;
                             <?php echo t("Toggle Dropdown"); ?>
                         </span>
                     </button>
+                    
+                    <?php echo $bulkMenu->getMenuElement(); ?>
                 </div>
             </th>
             <?php if(isset($result)) { ?>
