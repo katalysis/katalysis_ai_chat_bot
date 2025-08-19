@@ -349,7 +349,13 @@ EXAMPLES OF INCORRECT RESPONSES:
 
         // Update chat record with message information
         if ($chatId) {
-            $this->updateChatWithMessage($chatId, $message);
+            if ($isNewChat) {
+                // For new chats, this user message becomes the first message
+                $this->updateChatWithFirstMessage($chatId, $message);
+            } else {
+                // For existing chats, this user message becomes the last message
+                $this->updateChatWithLastMessage($chatId, $message);
+            }
         }
 
         // Get AI configuration
@@ -865,30 +871,105 @@ Available documents (with titles and URLs):
     }
 
     /**
-     * Update chat record with message information
+     * Create a clean text preview from AI response content
+     * Removes HTML, links, action buttons, and more info sections
      */
-    private function updateChatWithMessage(int $chatId, string $message): void
+    private function createCleanMessagePreview(string $message): string
+    {
+        // Remove HTML tags
+        $cleanText = strip_tags($message);
+        
+        // Remove action buttons and more info sections
+        $cleanText = preg_replace('/More Information:.*$/s', '', $cleanText);
+        $cleanText = preg_replace('/Test Button.*$/s', '', $cleanText);
+        
+        // Remove any remaining action button text
+        $cleanText = preg_replace('/\[.*?\]/', '', $cleanText);
+        
+        // Clean up extra whitespace and newlines
+        $cleanText = preg_replace('/\s+/', ' ', $cleanText);
+        $cleanText = trim($cleanText);
+        
+        // Remove any remaining special characters that might make the preview unclear
+        $cleanText = str_replace(['&nbsp;', '&amp;', '&quot;', '&lt;', '&gt;'], [' ', '&', '"', '<', '>'], $cleanText);
+        
+        // Limit length for preview (e.g., 150 characters)
+        if (strlen($cleanText) > 150) {
+            $cleanText = substr($cleanText, 0, 147) . '...';
+        }
+        
+        return $cleanText;
+    }
+
+    /**
+     * Update chat record with first user message preview
+     */
+    private function updateChatWithFirstMessage(int $chatId, string $message): void
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
+            
+            if ($chat && empty($chat->getFirstMessage())) {
+                // For user messages, just clean up whitespace (no HTML to remove)
+                $cleanPreview = trim(preg_replace('/\s+/', ' ', $message));
+                
+                // Limit length for preview
+                if (strlen($cleanPreview) > 150) {
+                    $cleanPreview = substr($cleanPreview, 0, 147) . '...';
+                }
+                
+                $chat->setFirstMessage($cleanPreview);
+                $entityManager->persist($chat);
+                $entityManager->flush();
+            }
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to update chat with first message: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update chat record with last message preview
+     */
+    private function updateChatWithLastMessage(int $chatId, string $message): void
     {
         try {
             $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
             $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
             
             if ($chat) {
-                // Set first message if not already set
-                if (empty($chat->getFirstMessage())) {
-                    $chat->setFirstMessage($message);
-                }
+                // Create clean text preview (removes HTML, links, action buttons)
+                $cleanPreview = $this->createCleanMessagePreview($message);
                 
-                // Always update last message
-                $chat->setLastMessage($message);
-                
+                $chat->setLastMessage($cleanPreview);
                 $entityManager->persist($chat);
                 $entityManager->flush();
             }
             
         } catch (\Exception $e) {
-            // Log the error but don't fail the chat request
-            \Log::addError('Failed to update chat with message: ' . $e->getMessage());
+            \Log::addError('Failed to update chat with last message: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Increment user message count for a chat record
+     */
+    private function incrementUserMessageCount(int $chatId): void
+    {
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
+            
+            if ($chat) {
+                $currentCount = $chat->getUserMessageCount() ?? 0;
+                $chat->setUserMessageCount($currentCount + 1);
+                $entityManager->persist($chat);
+                $entityManager->flush();
+            }
+            
+        } catch (\Exception $e) {
+            \Log::addError('Failed to increment user message count: ' . $e->getMessage());
         }
     }
 
@@ -1075,14 +1156,51 @@ Available documents (with titles and URLs):
             $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
             
             if ($chat) {
-                // Update chat with last message
+                // Count user messages for engagement tracking
+                $userMessageCount = 0;
+                foreach ($messages as $message) {
+                    if (isset($message['sender']) && $message['sender'] === 'user') {
+                        $userMessageCount++;
+                    }
+                }
+                
+                // Find first user message for firstMessage field
+                $firstUserMessage = null;
+                foreach ($messages as $message) {
+                    if (isset($message['sender']) && $message['sender'] === 'user') {
+                        $firstUserMessage = $message;
+                        break;
+                    }
+                }
+                
+                // Find last message for lastMessage field
                 $lastMessage = end($messages);
+                
+                // Update all fields in one operation
+                $chat->setUserMessageCount($userMessageCount);
+                
+                // Set first message if not already set
+                if ($firstUserMessage && isset($firstUserMessage['content']) && empty($chat->getFirstMessage())) {
+                    $cleanPreview = trim(preg_replace('/\s+/', ' ', $firstUserMessage['content']));
+                    if (strlen($cleanPreview) > 150) {
+                        $cleanPreview = substr($cleanPreview, 0, 147) . '...';
+                    }
+                    $chat->setFirstMessage($cleanPreview);
+                }
+                
+                // Set last message
                 if ($lastMessage && isset($lastMessage['content'])) {
-                    $this->updateChatWithMessage($chatId, $lastMessage['content']);
+                    $cleanPreview = $this->createCleanMessagePreview($lastMessage['content']);
+                    $chat->setLastMessage($cleanPreview);
                 }
                 
                 // Store complete chat history
-                $this->updateChatWithCompleteHistory($chatId, $messages);
+                $chatHistoryJson = json_encode($messages, JSON_PRETTY_PRINT);
+                $chat->setCompleteChatHistory($chatHistoryJson);
+                
+                // Persist all changes in one operation
+                $entityManager->persist($chat);
+                $entityManager->flush();
             }
             
         } catch (\Exception $e) {

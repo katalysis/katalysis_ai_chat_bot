@@ -26,6 +26,7 @@ use KatalysisAiChatBot\Search\Chats\Field\Field\LaunchPageUrlField;
 use KatalysisAiChatBot\Search\Chats\Field\Field\LaunchPageTypeField;
 use KatalysisAiChatBot\Search\Chats\Field\Field\FirstMessageField;
 use KatalysisAiChatBot\Search\Chats\Field\Field\LastMessageField;
+use KatalysisAiChatBot\Search\Chats\Field\Field\UserMessageCountField;
 use KatalysisAiChatBot\Search\Chats\Field\Field\UtmIdField;
 use KatalysisAiChatBot\Search\Chats\Field\Field\UtmMediumField;
 use KatalysisAiChatBot\Search\Chats\Field\Field\UtmCampaignField;
@@ -58,6 +59,7 @@ class Manager extends FieldManager
         $messageProperties = [
             new FirstMessageField(),
             new LastMessageField(),
+            new UserMessageCountField(),
         ];
         
         $utmProperties = [
