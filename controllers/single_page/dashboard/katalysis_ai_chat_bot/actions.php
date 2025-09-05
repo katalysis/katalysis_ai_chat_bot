@@ -86,6 +86,9 @@ class Actions extends DashboardPageController
             $entry->setIcon($data["icon"]);
             $entry->setTriggerInstruction($data["triggerInstruction"]);
             $entry->setResponseInstruction($data["responseInstruction"]);
+            $entry->setActionType($data["actionType"] ?? 'basic');
+            $entry->setFormSteps($data["formSteps"] ?? '');
+            $entry->setShowImmediately($data["showImmediately"] ?? false);
             
             $this->entityManager->persist($entry);
             $this->entityManager->flush();
@@ -111,6 +114,9 @@ class Actions extends DashboardPageController
             $this->set('icon', $entry->getIcon());
             $this->set('triggerInstruction', $entry->getTriggerInstruction());
             $this->set('responseInstruction', $entry->getResponseInstruction());
+            $this->set('actionType', $entry->getActionType() ?: 'basic');
+            $this->set('formSteps', $entry->getFormSteps() ?: '');
+            $this->set('showImmediately', $entry->getShowImmediately());
             $this->set('createdBy', $entry->getCreatedBy());
             $this->set('createdDate', $entry->getCreatedDate() ? $dateHelper->formatDateTime($entry->getCreatedDate()) : '');
             
@@ -126,6 +132,9 @@ class Actions extends DashboardPageController
             $this->set('icon', '');
             $this->set('triggerInstruction', '');
             $this->set('responseInstruction', '');
+            $this->set('actionType', 'basic');
+            $this->set('formSteps', '');
+            $this->set('showImmediately', false);
             $this->set('createdBy', '');
             $this->set('createdDate', '');
             $this->set('createdByName', '');

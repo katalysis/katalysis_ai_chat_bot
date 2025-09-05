@@ -319,8 +319,6 @@ $ps = $app->make('helper/form/page_selector');
                     }
                 </script>
                 <script>
-                    console.log('=== CHAT SCRIPT LOADED ===');
-                    console.log('Current time:', new Date().toISOString());
 
                     // Initialize currentMode variable
                     let currentMode = 'rag'; // Default to RAG mode
@@ -329,15 +327,12 @@ $ps = $app->make('helper/form/page_selector');
 
                     // Function to regenerate welcome message (resets flag and calls generateAIWelcomeMessage)
                     function regenerateWelcomeMessage() {
-                        console.log('Regenerating welcome message...');
                         welcomeMessageGenerated = false;
                         generateAIWelcomeMessage();
                     }
 
                     // Function to generate AI-powered welcome message
                     function generateAIWelcomeMessage() {
-                        console.log('generateAIWelcomeMessage called');
-                        console.log('welcomeMessageGenerated flag:', welcomeMessageGenerated);
 
                         const now = new Date();
                         const hour = now.getHours();
@@ -358,15 +353,10 @@ $ps = $app->make('helper/form/page_selector');
                             if (debugPageUrl) pageUrl = debugPageUrl;
                         }
 
-                        console.log('Page context - Title:', pageTitle, 'URL:', pageUrl, 'Type:', pageType);
 
                         // Get the configurable welcome message prompt from the textarea
                         let welcomePrompt = document.getElementById('welcome_message_prompt').value || `<?php echo addslashes($welcomeMessagePrompt); ?>`;
 
-                        console.log('=== WELCOME MESSAGE DEBUG ===');
-                        console.log('Textarea value:', document.getElementById('welcome_message_prompt').value);
-                        console.log('PHP fallback value:', `<?php echo addslashes($welcomeMessagePrompt); ?>`);
-                        console.log('Final welcomePrompt before replacements:', welcomePrompt);
 
                         // Replace placeholders with actual values
                         welcomePrompt = welcomePrompt.replace(/{time_of_day}/g, hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening');
@@ -376,9 +366,6 @@ $ps = $app->make('helper/form/page_selector');
                         // Append essential formatting instructions
                         welcomePrompt += `<?php echo addslashes($essentialWelcomeMessageInstructions); ?>`;
 
-                        console.log('Welcome prompt prepared:', welcomePrompt.substring(0, 200) + '...');
-                        console.log('Full welcome prompt:', welcomePrompt);
-                        console.log('=== END WELCOME MESSAGE DEBUG ===');
 
                         // Prepare request data with debug context if enabled
                         let requestData = {
@@ -398,11 +385,9 @@ $ps = $app->make('helper/form/page_selector');
                                     page_type: debugPageType,
                                     page_url: debugPageUrl
                                 };
-                                console.log('Adding debug context to welcome message request:', requestData.debug_context);
                             }
                         }
 
-                        console.log('Sending welcome message request:', requestData);
 
                         // Use the existing AI system to generate the welcome message
                         $.ajax({
@@ -414,7 +399,6 @@ $ps = $app->make('helper/form/page_selector');
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('AI Welcome Response:', data);
 
                                 let welcomeText = '';
 
@@ -424,15 +408,11 @@ $ps = $app->make('helper/form/page_selector');
                                     welcomeText = data;
                                 }
 
-                                console.log('Processed welcome text:', welcomeText);
-                                console.log('Welcome text length:', welcomeText ? welcomeText.length : 0);
 
                                 // Show and animate the welcome response
                                 const welcomeResponse = document.getElementById('welcome-response');
                                 const welcomeElement = document.getElementById('welcome-message');
 
-                                console.log('Welcome response element found:', !!welcomeResponse);
-                                console.log('Welcome message element found:', !!welcomeElement);
 
                                 if (welcomeResponse && welcomeElement) {
                                     // Set the message text
@@ -441,17 +421,10 @@ $ps = $app->make('helper/form/page_selector');
                                         
                                         // Also update the header greeting
                                         const headerGreeting = document.getElementById('ai-header-greeting');
-                                        console.log('Header greeting element found:', !!headerGreeting);
                                         if (headerGreeting) {
-                                            // Extract a short greeting from the welcome message (first sentence or first 50 chars)
-                                            let shortGreeting = welcomeText.split('.')[0]; // Get first sentence
-                                            if (shortGreeting.length > 50) {
-                                                shortGreeting = welcomeText.substring(0, 50) + '...';
-                                            }
-                                            console.log('Updating header greeting to:', shortGreeting);
-                                            headerGreeting.textContent = shortGreeting;
+                                            // Display the full welcome message without truncation
+                                            headerGreeting.textContent = welcomeText;
                                         } else {
-                                            console.error('Header greeting element not found!');
                                         }
                                     } else {
                                         // If AI response is empty, show a simple welcome message
@@ -475,15 +448,9 @@ $ps = $app->make('helper/form/page_selector');
                                         welcomeResponse.classList.remove('welcome-animate');
                                     }, 600);
                                 } else {
-                                    console.error('Welcome response elements not found!');
-                                    console.error('welcomeResponse:', welcomeResponse);
-                                    console.error('welcomeElement:', welcomeElement);
                                 }
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error generating welcome message:', error);
-                                console.error('Status:', status);
-                                console.error('Response:', xhr.responseText);
 
                                 // Show a fallback welcome message on error
                                 const welcomeResponse = document.getElementById('welcome-response');
@@ -496,12 +463,9 @@ $ps = $app->make('helper/form/page_selector');
 
                                     // Update header with fallback greeting
                                     const headerGreeting = document.getElementById('ai-header-greeting');
-                                    console.log('Error handling - Header greeting element found:', !!headerGreeting);
                                     if (headerGreeting) {
                                         headerGreeting.textContent = 'Hi! How can we help you today?';
-                                        console.log('Updated header greeting in error handling');
                                     } else {
-                                        console.error('Header greeting element not found in error handling!');
                                     }
 
                                     setTimeout(function () {
@@ -526,7 +490,6 @@ $ps = $app->make('helper/form/page_selector');
                             ragModeToggle.addEventListener('change', function () {
                                 currentMode = this.checked ? 'rag' : 'basic';
                                 updateModeDescription();
-                                console.log('Mode changed to:', currentMode);
                             });
                         }
 
@@ -543,32 +506,25 @@ $ps = $app->make('helper/form/page_selector');
 
                     // Chat persistence functions
                     function saveChatHistory() {
-                        console.log('Saving chat history...');
 
                         const chatContainer = document.getElementById('chat');
                         if (!chatContainer) {
-                            console.error('Chat container not found!');
                             return;
                         }
 
                         const chatHistory = chatContainer.innerHTML;
-                        console.log('Chat history length:', chatHistory.length);
 
                         try {
                             localStorage.setItem('katalysis_chat_history', chatHistory);
                             localStorage.setItem('katalysis_chat_timestamp', Date.now().toString());
-                            console.log('Chat history saved successfully');
                         } catch (e) {
-                            console.error('Error saving chat history:', e);
                         }
                     }
 
                     function loadChatHistory() {
-                        console.log('Loading chat history...');
 
                         const chatContainer = document.getElementById('chat');
                         if (!chatContainer) {
-                            console.error('Chat container not found!');
                             return;
                         }
 
@@ -576,28 +532,22 @@ $ps = $app->make('helper/form/page_selector');
                             const savedHistory = localStorage.getItem('katalysis_chat_history');
                             const timestamp = localStorage.getItem('katalysis_chat_timestamp');
 
-                            console.log('Saved history exists:', !!savedHistory);
-                            console.log('Timestamp exists:', !!timestamp);
 
                             if (savedHistory && timestamp) {
                                 const age = Date.now() - parseInt(timestamp);
                                 const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
-                                console.log('Chat age:', age, 'ms');
 
                                 if (age < maxAge) {
-                                    console.log('Loading saved chat history...');
 
                                     // Replace the entire chat container content
                                     chatContainer.innerHTML = savedHistory;
 
-                                    console.log('Chat history loaded successfully');
 
                                     // Check if the loaded chat history contains any messages
                                     const hasMessages = chatContainer.querySelector('.user-message, .ai-response') !== null;
 
                                     if (!hasMessages && !welcomeMessageGenerated) {
-                                        console.log('Chat history loaded but no messages found, generating welcome message...');
                                         welcomeMessageGenerated = true;
                                         setTimeout(function () {
                                             generateAIWelcomeMessage();
@@ -609,11 +559,9 @@ $ps = $app->make('helper/form/page_selector');
                                         scrollToBottom();
                                     }, 100);
                                 } else {
-                                    console.log('Chat history is too old, clearing...');
                                     clearChatHistory();
                                 }
                             } else {
-                                console.log('No saved chat history found');
                                 // If no saved chat history, ensure welcome message is generated
                                 if (!welcomeMessageGenerated) {
                                     welcomeMessageGenerated = true;
@@ -623,7 +571,6 @@ $ps = $app->make('helper/form/page_selector');
                                 }
                             }
                         } catch (e) {
-                            console.error('Error loading chat history:', e);
                             // If there's an error loading chat history, still try to generate welcome message
                             if (!welcomeMessageGenerated) {
                                 welcomeMessageGenerated = true;
@@ -635,7 +582,6 @@ $ps = $app->make('helper/form/page_selector');
                     }
 
                     function clearChatHistory() {
-                        console.log('Clearing chat history...');
 
                         // Clear browser localStorage
                         localStorage.removeItem('katalysis_chat_history');
@@ -652,7 +598,6 @@ $ps = $app->make('helper/form/page_selector');
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('Server chat history cleared:', data);
                                 // Instead of reloading, clear the chat container and generate welcome message
                                 const chatContainer = document.getElementById('chat');
                                 if (chatContainer) {
@@ -683,7 +628,6 @@ $ps = $app->make('helper/form/page_selector');
                                 }
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error clearing server chat history:', error);
                                 // Still try to clear locally and generate welcome message
                                 const chatContainer = document.getElementById('chat');
                                 if (chatContainer) {
@@ -715,9 +659,6 @@ $ps = $app->make('helper/form/page_selector');
                     function scrollToBottom() {
                         const chatContainer = document.getElementById('chat');
                         if (chatContainer) {
-                            console.log('Scrolling to bottom...');
-                            console.log('Scroll height:', chatContainer.scrollHeight);
-                            console.log('Client height:', chatContainer.clientHeight);
 
                             // Force scroll to bottom
                             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -738,13 +679,8 @@ $ps = $app->make('helper/form/page_selector');
                         const welcomeResponse = document.getElementById('welcome-response');
                         const welcomeElement = document.getElementById('welcome-message');
 
-                        console.log('Welcome elements check:');
-                        console.log('- welcome-response exists:', !!welcomeResponse);
-                        console.log('- welcome-message exists:', !!welcomeElement);
 
                         if (welcomeResponse) {
-                            console.log('- welcome-response display:', welcomeResponse.style.display);
-                            console.log('- welcome-response visibility:', window.getComputedStyle(welcomeResponse).visibility);
                         }
 
                         return welcomeResponse && welcomeElement;
@@ -752,7 +688,6 @@ $ps = $app->make('helper/form/page_selector');
 
                     // Load chat history when page loads
                     $(document).ready(function () {
-                        console.log('jQuery ready - loading chat history...');
 
                         // Check welcome elements immediately
                         checkWelcomeElements();
@@ -771,7 +706,6 @@ $ps = $app->make('helper/form/page_selector');
                         setTimeout(function () {
                             const welcomeResponse = document.getElementById('welcome-response');
                             if (welcomeResponse && welcomeResponse.style.display === 'none') {
-                                console.log('Fallback: Welcome message not shown, generating now...');
                                 if (!welcomeMessageGenerated) {
                                     welcomeMessageGenerated = true;
                                     generateAIWelcomeMessage();
@@ -828,7 +762,6 @@ $ps = $app->make('helper/form/page_selector');
                                     page_type: debugPageType,
                                     page_url: debugPageUrl
                                 };
-                                console.log('Adding debug context to request:', requestData.debug_context);
                             }
                         }
 
@@ -841,7 +774,6 @@ $ps = $app->make('helper/form/page_selector');
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('Response:', data);
                                 $(".ai-loading").remove();
 
                                 // Handle new response format with metadata
@@ -887,29 +819,20 @@ $ps = $app->make('helper/form/page_selector');
                                 // Store chat session ID if this is a new chat
                                 if (data.chat_id && !chatSessionId) {
                                     chatSessionId = data.chat_id;
-                                    console.log('New chat session created with ID:', chatSessionId);
                                 }
 
                                 saveChatHistory(); // Save after AI response
 
                                 // Display action buttons if provided
-                                console.log('=== FRONTEND ACTION CHECK ===');
-                                console.log('Response data keys:', Object.keys(data));
-                                console.log('Actions field exists:', 'actions' in data);
-                                console.log('Actions value:', data.actions);
 
                                 // Check if action buttons container exists
                                 const actionButtons = document.getElementById('action-buttons');
-                                console.log('Action buttons container exists:', !!actionButtons);
                                 if (actionButtons) {
-                                    console.log('Action buttons container display:', actionButtons.style.display);
                                 }
 
                                 if (data.actions && data.actions.length > 0) {
-                                    console.log('Displaying action buttons:', data.actions);
                                     // displayActionButtons(data.actions); // This function is no longer needed
                                 } else {
-                                    console.log('No actions to display');
                                     // hideActionButtons(); // This function is no longer needed
                                 }
 
@@ -917,7 +840,6 @@ $ps = $app->make('helper/form/page_selector');
                                 document.getElementById('message').value = '';
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error:', error);
                                 $(".ai-loading").remove();
                                 $("#chat").append('<div class="ai-error">Error: ' + error + '</div>');
                                 saveChatHistory(); // Save after error
@@ -973,7 +895,6 @@ $ps = $app->make('helper/form/page_selector');
                                     page_type: debugPageType,
                                     page_url: debugPageUrl
                                 };
-                                console.log('Adding debug context to request:', requestData.debug_context);
                             }
                         }
 
@@ -986,7 +907,6 @@ $ps = $app->make('helper/form/page_selector');
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('Response:', data);
                                 $(".ai-loading").remove();
 
                                 // Handle new response format with metadata
@@ -1032,29 +952,20 @@ $ps = $app->make('helper/form/page_selector');
                                 // Store chat session ID if this is a new chat
                                 if (data.chat_id && !chatSessionId) {
                                     chatSessionId = data.chat_id;
-                                    console.log('New chat session created with ID:', chatSessionId);
                                 }
 
                                 saveChatHistory(); // Save after AI response
 
                                 // Display action buttons if provided
-                                console.log('=== FRONTEND ACTION CHECK ===');
-                                console.log('Response data keys:', Object.keys(data));
-                                console.log('Actions field exists:', 'actions' in data);
-                                console.log('Actions value:', data.actions);
 
                                 // Check if action buttons container exists
                                 const actionButtons = document.getElementById('action-buttons');
-                                console.log('Action buttons container exists:', !!actionButtons);
                                 if (actionButtons) {
-                                    console.log('Action buttons container display:', actionButtons.style.display);
                                 }
 
                                 if (data.actions && data.actions.length > 0) {
-                                    console.log('Displaying action buttons:', data.actions);
                                     // displayActionButtons(data.actions); // This function is no longer needed
                                 } else {
-                                    console.log('No actions to display');
                                     // hideActionButtons(); // This function is no longer needed
                                 }
 
@@ -1062,7 +973,6 @@ $ps = $app->make('helper/form/page_selector');
                                 document.getElementById('message').value = '';
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error:', error);
                                 $(".ai-loading").remove();
                                 $("#chat").append('<div class="ai-error">Error: ' + error + '</div>');
                                 saveChatHistory();
@@ -1259,7 +1169,6 @@ $ps = $app->make('helper/form/page_selector');
                                 scrollToBottom();
                             })
                             .catch(error => {
-                                console.error('Error:', error);
                                 $("#chat").append('<div class="ai-error">Error executing action: ' + error.message + '</div>');
                                 saveChatHistory();
                                 scrollToBottom();
@@ -1357,16 +1266,11 @@ $ps = $app->make('helper/form/page_selector');
 
                         // Test function for header update debugging
                         function testHeaderUpdate() {
-                            console.log('Testing header update...');
                             const headerGreeting = document.getElementById('ai-header-greeting');
-                            console.log('Header greeting element found:', !!headerGreeting);
                             if (headerGreeting) {
                                 const testText = 'Test Header Update - ' + new Date().toLocaleTimeString();
-                                console.log('Updating header to:', testText);
                                 headerGreeting.textContent = testText;
-                                console.log('Header updated successfully');
                             } else {
-                                console.error('Header greeting element not found!');
                             }
                         }
 
@@ -1437,9 +1341,7 @@ $ps = $app->make('helper/form/page_selector');
                         document.addEventListener('DOMContentLoaded', function () {
                             // Test if header element exists
                             const headerGreeting = document.getElementById('ai-header-greeting');
-                            console.log('Page loaded - Header greeting element found:', !!headerGreeting);
                             if (headerGreeting) {
-                                console.log('Header greeting current text:', headerGreeting.textContent);
                             }
                             
                             // Handle instructions textarea
@@ -1510,21 +1412,16 @@ $ps = $app->make('helper/form/page_selector');
                         document.addEventListener('DOMContentLoaded', function () {
                             const forceActionsBtn = document.getElementById('testForceActionsBtn');
                             if (forceActionsBtn) {
-                                console.log('Force actions button found');
                                 forceActionsBtn.addEventListener('click', function () {
-                                    console.log('Force actions button clicked via event listener');
                                     testForceActions();
                                 });
                             } else {
-                                console.log('Force actions button not found');
                             }
                         });
 
                         // Test force actions function
                         function testForceActions() {
-                            console.log('testForceActions function called');
                             const resultsDiv = document.getElementById('forceActionsResults');
-                            console.log('Results div:', resultsDiv);
                             resultsDiv.innerHTML = '<div class="alert alert-info">Testing force actions...</div>';
 
                             fetch('<?php echo $controller->action('test_force_actions'); ?>', {
@@ -1561,7 +1458,6 @@ $ps = $app->make('helper/form/page_selector');
 
                         // Test direct AI function
                         function testDirectAI() {
-                            console.log('testDirectAI function called');
                             const resultsDiv = document.getElementById('forceActionsResults');
                             resultsDiv.innerHTML = '<div class="alert alert-info">Testing direct AI...</div>';
 

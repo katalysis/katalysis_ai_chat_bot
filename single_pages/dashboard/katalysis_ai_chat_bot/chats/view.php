@@ -55,6 +55,19 @@ defined('C5_EXECUTE') or die("Access Denied.");
                                 <small class="text-muted ms-2"><?php echo t('engagement metric'); ?></small>
                             </td>
                         </tr>
+                        <tr>
+                            <th style="width:40%;"><?php echo t('Welcome Message'); ?></th>
+                            <td>
+                                <?php if ($chat->getWelcomeMessage() && trim($chat->getWelcomeMessage()) !== ''): ?>
+                                    <div class="welcome-message-display bg-light p-2 rounded border">
+                                        <i class="fa fa-comments text-primary me-1"></i>
+                                        <?php echo htmlspecialchars($chat->getWelcomeMessage()); ?>
+                                    </div>
+                                <?php else: ?>
+                                    <em class="text-muted"><?php echo t('No welcome message recorded'); ?></em>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
                 <h4><?php echo t('Page Information'); ?></h4>
@@ -146,6 +159,25 @@ defined('C5_EXECUTE') or die("Access Denied.");
                             <?php
                             $chatHistory = json_decode($chat->getCompleteChatHistory(), true);
                             if (is_array($chatHistory) && !empty($chatHistory)): ?>
+                                
+                                <?php // Display welcome message first if it exists ?>
+                                <?php if ($chat->getWelcomeMessage() && trim($chat->getWelcomeMessage()) !== ''): ?>
+                                    <div class="ai-response welcome-message-chat-display mb-3">
+                                        <div class="message-content">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fa fa-robot me-2 text-primary"></i>
+                                                <strong><?php echo t('AI Assistant'); ?></strong>
+                                                <small class="ms-auto me-2">
+                                                    <em class="text-muted"><?php echo t('Welcome Message'); ?></em>
+                                                </small>
+                                            </div>
+                                            <div class="welcome-message-text bg-primary bg-opacity-10 p-3 rounded border-start border-primary border-4">
+                                                <?php echo nl2br(htmlspecialchars($chat->getWelcomeMessage())); ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                
                                 <?php foreach ($chatHistory as $message): ?>
                                     <div class="<?php echo $message['sender'] === 'user' ? 'user-message' : 'ai-response'; ?>">
                                         <div class="message-content">
@@ -160,7 +192,17 @@ defined('C5_EXECUTE') or die("Access Denied.");
                                                 <?php if ($message['sender'] === 'ai'): ?>
                                                     <?php echo nl2br($message['content']); ?>
                                                 <?php else: ?>
-                                                    <?php echo nl2br(htmlspecialchars($message['content'])); ?>
+                                                    <?php 
+                                                    // Check if this is a form submission message
+                                                    if (strpos($message['content'], 'Form submitted:') === 0 && strpos($message['content'], '<div class="form-submission-summary">') !== false) {
+                                                        // For form submissions, allow safe HTML but strip potentially dangerous tags
+                                                        $allowedTags = '<div><ul><li><strong>';
+                                                        echo nl2br(strip_tags($message['content'], $allowedTags));
+                                                    } else {
+                                                        // For regular user messages, escape HTML
+                                                        echo nl2br(htmlspecialchars($message['content']));
+                                                    }
+                                                    ?>
                                                 <?php endif; ?>
                                             <?php else: ?>
                                                 <em class="text-muted"><?php echo t('Message content not available'); ?></em>
@@ -170,11 +212,49 @@ defined('C5_EXECUTE') or die("Access Denied.");
                                 <?php endforeach; ?>
 
                             <?php else: ?>
-                                <em class="text-muted"><?php echo t('No chat history available'); ?></em>
+                                <?php // If no chat history but there's a welcome message, show just the welcome message ?>
+                                <?php if ($chat->getWelcomeMessage() && trim($chat->getWelcomeMessage()) !== ''): ?>
+                                    <div class="ai-response welcome-message-chat-display mb-3">
+                                        <div class="message-content">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fa fa-robot me-2 text-primary"></i>
+                                                <strong><?php echo t('AI Assistant'); ?></strong>
+                                                <small class="ms-auto me-2">
+                                                    <em class="text-muted"><?php echo t('Welcome Message'); ?></em>
+                                                </small>
+                                            </div>
+                                            <div class="welcome-message-text bg-primary bg-opacity-10 p-3 rounded border-start border-primary border-4">
+                                                <?php echo nl2br(htmlspecialchars($chat->getWelcomeMessage())); ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <em class="text-muted mt-2 d-block"><?php echo t('No further conversation yet'); ?></em>
+                                <?php else: ?>
+                                    <em class="text-muted"><?php echo t('No chat history available'); ?></em>
+                                <?php endif; ?>
                             <?php endif; ?>
                             
                         <?php else: ?>
-                            <em class="text-muted"><?php echo t('Chat history not yet implemented'); ?></em>
+                            <?php // If no complete chat history but there's a welcome message, show just the welcome message ?>
+                            <?php if ($chat->getWelcomeMessage() && trim($chat->getWelcomeMessage()) !== ''): ?>
+                                <div class="ai-response welcome-message-chat-display mb-3">
+                                    <div class="message-content">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="fa fa-robot me-2 text-primary"></i>
+                                            <strong><?php echo t('AI Assistant'); ?></strong>
+                                            <small class="ms-auto me-2">
+                                                <em class="text-muted"><?php echo t('Welcome Message'); ?></em>
+                                            </small>
+                                        </div>
+                                        <div class="welcome-message-text bg-primary bg-opacity-10 p-3 rounded border-start border-primary border-4">
+                                            <?php echo nl2br(htmlspecialchars($chat->getWelcomeMessage())); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <em class="text-muted mt-2 d-block"><?php echo t('No further conversation yet'); ?></em>
+                            <?php else: ?>
+                                <em class="text-muted"><?php echo t('Chat history not yet implemented'); ?></em>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -182,3 +262,27 @@ defined('C5_EXECUTE') or die("Access Denied.");
         </div>
     </div>
 </div>
+
+<style>
+/* Form submission styling for dashboard chat view */
+.form-submission-summary {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 3px solid #007bff;
+    margin-top: 8px;
+}
+
+.form-submission-summary ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.form-submission-summary li {
+    margin-bottom: 4px;
+}
+
+.form-submission-summary strong {
+    color: #495057;
+}
+</style>

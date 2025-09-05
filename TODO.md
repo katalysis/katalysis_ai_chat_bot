@@ -23,6 +23,8 @@
 - [x] Icon spacing and visual improvements
 - [x] Dynamic AI header greeting
 - [x] Minimize/maximize functionality with chevron icon
+- [x] make colour settings available in block interface
+
 
 ### Database & Data Management
 - [x] Chat entity with comprehensive fields
@@ -33,6 +35,9 @@
 - [x] User contact information fields
 - [x] Page context and location tracking
 
+### Code Quality
+- [x] Remove debugging console.log statements from frontend
+
 ---
 
 ## 🔧 **IMMEDIATE IMPROVEMENTS NEEDED**
@@ -42,14 +47,12 @@
 - [ ] Resolve potential database transaction conflicts
 - [ ] Ensure proper error handling for failed AI responses
 - [ ] Validate user input sanitization
-- [ ] make colour settings available in block interface
 - [ ] Remove unnecessary fields in block interface
-- [ ] Add welcome message to chat database
+- [X] Add welcome message to chat database
 - [ ] Make links open in same window
 - [ ] Check persistence of welcome maeesage across diefferent pages
 
 ### Code Quality
-- [ ] Remove debugging console.log statements from frontend
 - [ ] Add proper PHPDoc comments to all methods
 - [ ] Implement proper exception handling and logging
 - [ ] Add input validation and sanitization
@@ -57,7 +60,6 @@
 
 ### Performance
 - [ ] Optimize database queries for large chat volumes
-- [ ] Implement chat history pagination for long conversations
 - [ ] Add caching for AI responses where appropriate
 - [ ] Optimize frontend JavaScript for better performance
 
@@ -75,6 +77,7 @@
 
 
 ### Dashboard Improvements
+- [ ] Add email notifications on form completion and/or after chat completion (5 minutes inaction)
 - [ ] Implement chat filtering by date range
 - [ ] Create chat performance metrics
 - [ ] Add bulk actions for chat management

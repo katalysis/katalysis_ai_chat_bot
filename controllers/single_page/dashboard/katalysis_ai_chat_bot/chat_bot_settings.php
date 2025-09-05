@@ -12,6 +12,8 @@ use Concrete\Core\Http\Response;
 use Concrete\Core\Http\ResponseFactory;
 use Concrete\Core\Http\Request;
 use KatalysisAiChatBot\RagAgent;
+use KatalysisAiChatBot\ChatFormProcessor;
+use KatalysisAiChatBot\Entity\Chat;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class ChatBotSettings extends DashboardPageController
@@ -198,7 +200,7 @@ EXAMPLES OF INCORRECT RESPONSES:
      */
     private function getDefaultWelcomeMessagePrompt(): string
     {
-        return "Generate a short, friendly welcome message for Katalysis, a UK-based web design and development company. 
+        return "Generate a friendly welcome message for Katalysis, a UK-based web design and development company. 
 
 Context:
 - Time of day: {time_of_day}
@@ -207,10 +209,10 @@ Context:
 
 Requirements:
 - Include time-based greeting (Good morning/afternoon/evening)
-- Keep it very brief (1 sentence maximum)
+- Keep it concise but complete (1-2 sentences)
 - Be welcoming, appreciative and professional
-- End with \"How can we help?\"
-- Maximum 15-20 words total";
+- End with \"How can we help?\" or similar invitation
+- Keep under 40 words for readability";
     }
 
     /**
@@ -312,6 +314,9 @@ EXAMPLES OF INCORRECT RESPONSES:
 
         // Get the request object
         $request = $this->app->make('request');
+        
+        // Debug log the raw request
+        error_log('ASK_AI DEBUG - Raw request content: ' . $request->getContent());
 
         // Check if this is a JSON request
         $contentType = $request->headers->get('Content-Type');
@@ -330,6 +335,18 @@ EXAMPLES OF INCORRECT RESPONSES:
             $pageType = $jsonData['page_type'] ?? null;
             $pageTitle = $jsonData['page_title'] ?? null;
             $pageUrl = $jsonData['page_url'] ?? null;
+            $welcomeMessage = $jsonData['welcome_message'] ?? null;
+            $isWelcomeGeneration = $jsonData['is_welcome_generation'] ?? false;
+            $chatId = $jsonData['chat_id'] ?? null;
+            $sessionId = $jsonData['session_id'] ?? null;
+            
+            // Debug log for welcome generation detection
+            error_log('ASK_AI DEBUG - isWelcomeGeneration flag value: ' . ($isWelcomeGeneration ? 'true' : 'false'));
+            error_log('ASK_AI DEBUG - isNewChat flag value: ' . ($isNewChat ? 'true' : 'false'));
+            error_log('ASK_AI DEBUG - mode value: ' . $mode);
+            if ($isWelcomeGeneration) {
+                error_log('WELCOME GENERATION - Detected welcome message generation request, will skip chat creation');
+            }
         } else {
             // Handle form data request
             $data = $request->request->all();
@@ -339,12 +356,29 @@ EXAMPLES OF INCORRECT RESPONSES:
             $pageType = $data['page_type'] ?? null;
             $pageTitle = $data['page_title'] ?? null;
             $pageUrl = $data['page_url'] ?? null;
+            $welcomeMessage = $data['welcome_message'] ?? null;
+            $isWelcomeGeneration = $data['is_welcome_generation'] ?? false;
+            $chatId = $data['chat_id'] ?? null;
+            $sessionId = $data['session_id'] ?? null;
         }
 
         // Create new chat record if this is a new chat session
-        $chatId = null;
         if ($isNewChat) {
-            $chatId = $this->createNewChatRecord($mode, $pageType, $pageTitle, $pageUrl);
+            $chatId = $this->createNewChatRecord($mode, $pageType, $pageTitle, $pageUrl, $sessionId);
+            
+            // Save the welcome message if provided
+            if ($chatId && $welcomeMessage) {
+                try {
+                    $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+                    $chat = $entityManager->find(\KatalysisAiChatBot\Entity\Chat::class, $chatId);
+                    if ($chat) {
+                        $chat->setWelcomeMessage($welcomeMessage);
+                        $entityManager->flush();
+                    }
+                } catch (\Exception $e) {
+                    \Log::addError('Failed to save welcome message to new chat record: ' . $e->getMessage());
+                }
+            }
         }
 
         // Update chat record with message information
@@ -355,6 +389,41 @@ EXAMPLES OF INCORRECT RESPONSES:
             } else {
                 // For existing chats, this user message becomes the last message
                 $this->updateChatWithLastMessage($chatId, $message);
+            }
+        }
+
+        // Check for active form processing
+        $formChatId = $chatId; // Use the chat_id from the request or newly created above
+        $isFormField = $jsonData['is_form_field'] ?? false;
+        $fieldKey = $jsonData['field_key'] ?? null;
+        
+        error_log('SESSION TRACKING - sessionId: ' . ($sessionId ?? 'NULL'));
+        error_log('SESSION TRACKING - formChatId: ' . ($formChatId ?? 'NULL'));
+        error_log('SESSION TRACKING - chatId: ' . ($chatId ?? 'NULL'));
+        error_log('SESSION TRACKING - isFormField: ' . ($isFormField ? 'true' : 'false'));
+        
+        if ($sessionId && $formChatId && $isFormField && $fieldKey) {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->getRepository(Chat::class)->find($formChatId);
+            
+            if ($chat) {
+                $formProcessor = new ChatFormProcessor($this->app);
+                
+                // Check if there's an active form
+                if ($formProcessor->hasActiveForm($chat)) {
+                    $activeFormState = $formProcessor->getActiveFormState($chat);
+                    
+                    // Process the form field response using the field key from the request
+                    $formResult = $formProcessor->processFieldResponse(
+                        $chat, 
+                        $activeFormState['action_id'], 
+                        $fieldKey,  // Use the field key from the user's response
+                        $message
+                    );
+                    
+                    // Return form-specific response
+                    return $this->handleFormResponse($formResult);
+                }
             }
         }
 
@@ -379,6 +448,15 @@ EXAMPLES OF INCORRECT RESPONSES:
             }
 
             if ($mode === 'rag') {
+                // Check if this is a welcome message request (backup check for RAG mode)
+                $isWelcomeRequest = $isWelcomeGeneration || 
+                    strpos($message, 'Generate a friendly welcome message') !== false || 
+                    strpos($message, 'Generate a short, friendly welcome message') !== false ||
+                    strpos($message, '{time_of_day}') !== false ||
+                    strpos($message, '{page_title}') !== false;
+                
+                error_log('ASK_AI DEBUG - RAG mode isWelcomeRequest check result: ' . ($isWelcomeRequest ? 'true' : 'false'));
+                
                 // RAG Mode: Use RagAgent with its instructions
                 $ragAgent = new RagAgent();
                 $ragAgent->setApp($this->app);
@@ -607,40 +685,209 @@ Available documents (with titles and URLs):
                 ];
 
                 // Add actions if any were suggested by the AI
+                $suggestedActions = []; // Initialize empty array
+                $immediateFormAction = null;
+                $entityManager = $this->app->make('Doctrine\ORM\EntityManager'); // Add missing entityManager for RAG mode
+                
                 if (!empty($actionIds)) {
+                    error_log('AI RESPONSE - Found action IDs: ' . implode(',', $actionIds));
                     $actionService = new \KatalysisAiChatBot\ActionService($this->app->make('Doctrine\ORM\EntityManager'));
-                    $suggestedActions = [];
                     
                     foreach ($actionIds as $actionId) {
+                        error_log('AI RESPONSE - Processing action ID: ' . $actionId);
                         $action = $actionService->getActionById($actionId);
                         if ($action) {
-                            $suggestedActions[] = [
+                            error_log('AI RESPONSE - Found action: ' . $action->getName() . ' (ID: ' . $action->getId() . ')');
+                            $actionData = [
                                 'id' => $action->getId(),
                                 'name' => $action->getName(),
                                 'icon' => $action->getIcon(),
                                 'triggerInstruction' => $action->getTriggerInstruction(),
-                                'responseInstruction' => $action->getResponseInstruction()
+                                'responseInstruction' => $action->getResponseInstruction(),
+                                'actionType' => $action->getActionType(),
+                                'showImmediately' => $action->getShowImmediately(),
+                                'formSteps' => $action->getFormSteps() ? json_decode($action->getFormSteps(), true) : []
                             ];
+                            
+                            // Check if this is a form action with show_immediately enabled
+                            if (in_array($action->getActionType(), ['form', 'dynamic_form', 'simple_form'])) {
+                                error_log('ACTION CHECK - Action: ' . $action->getName() . ' (ID: ' . $action->getId() . ') - Type: ' . $action->getActionType());
+                                error_log('ACTION CHECK - Show immediately: ' . ($action->getShowImmediately() ? 'true' : 'false'));
+                                
+                                if ($action->getShowImmediately()) {
+                                    error_log('IMMEDIATE FORM FOUND - Action: ' . $action->getName() . ' has show_immediately: true');
+                                    // This action should be shown immediately - store the first one found
+                                    if (!$immediateFormAction) {
+                                        $immediateFormAction = $actionData;
+                                        error_log('IMMEDIATE FORM SET - Setting immediateFormAction to: ' . $action->getName());
+                                    }
+                                } else {
+                                    error_log('ACTION CHECK - Action: ' . $action->getName() . ' does not have show_immediately: true');
+                                }
+                            } else {
+                                error_log('ACTION CHECK - Action: ' . $action->getName() . ' is not a form type: ' . $action->getActionType());
+                            }
+                            
+                            $suggestedActions[] = $actionData;
                         }
                     }
                     
+                    error_log('AFTER ACTION LOOP - immediateFormAction: ' . ($immediateFormAction ? 'SET' : 'NULL'));
+                    error_log('AFTER ACTION LOOP - suggestedActions count: ' . count($suggestedActions));
+                    
+                    // If we have an immediate form action, start it instead of showing buttons
+                    error_log('BEFORE IMMEDIATE FORM CHECK - About to check if immediateFormAction exists');
+                    if ($immediateFormAction) {
+                        error_log('IMMEDIATE FORM PROCESSING - About to start form processing...');
+                        error_log('IMMEDIATE FORM DETECTED - Action: ' . $immediateFormAction['name'] . ' (ID: ' . $immediateFormAction['id'] . ')');
+                        error_log('IMMEDIATE FORM - Form config: ' . json_encode($immediateFormAction['formConfig']));
+                        error_log('IMMEDIATE FORM - Form steps: ' . json_encode($immediateFormAction['formSteps']));
+                        
+                        // Start the form immediately
+                        error_log('IMMEDIATE FORM - About to create ChatFormProcessor...');
+                        try {
+                            $chatFormProcessor = new \KatalysisAiChatBot\ChatFormProcessor($this->app);
+                            error_log('IMMEDIATE FORM - ChatFormProcessor created successfully');
+                        } catch (\Error $e) {
+                            error_log('IMMEDIATE FORM ERROR - Failed to create ChatFormProcessor (Error): ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM ERROR - Stack trace: ' . $e->getTraceAsString());
+                            throw $e; // Re-throw to be caught by outer try-catch
+                        } catch (\Exception $e) {
+                            error_log('IMMEDIATE FORM ERROR - Failed to create ChatFormProcessor (Exception): ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM ERROR - Stack trace: ' . $e->getTraceAsString());
+                            throw $e; // Re-throw to be caught by outer try-catch
+                        } catch (\Throwable $e) {
+                            error_log('IMMEDIATE FORM ERROR - Failed to create ChatFormProcessor (Throwable): ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM ERROR - Stack trace: ' . $e->getTraceAsString());
+                            throw $e; // Re-throw to be caught by outer try-catch
+                        }
+                        
+                        try {
+                            // Use formChatId if chatId is empty
+                            $effectiveChatId = $chatId ?: $formChatId;
+                            
+                            // Validate chat ID before trying to find the entity
+                            if (empty($effectiveChatId)) {
+                                error_log('IMMEDIATE FORM ERROR - Chat ID is empty, looking for existing chat by session ID');
+                                
+                                // First try to find existing chat by session ID
+                                if ($sessionId) {
+                                    $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+                                    $existingChat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)
+                                        ->findOneBy(['sessionId' => $sessionId]);
+                                    if ($existingChat) {
+                                        $effectiveChatId = $existingChat->getId();
+                                        error_log('IMMEDIATE FORM - Found existing chat with ID: ' . $effectiveChatId . ' for session: ' . $sessionId);
+                                    }
+                                }
+                                
+                                // Only create new chat if no existing one found
+                                if (empty($effectiveChatId)) {
+                                    $effectiveChatId = $this->createNewChatRecord($mode, $pageType, $pageTitle, $pageUrl, $sessionId);
+                                    if (!$effectiveChatId) {
+                                        error_log('IMMEDIATE FORM ERROR - Failed to create new chat record');
+                                        throw new \Exception('Failed to create new chat record');
+                                    }
+                                    error_log('IMMEDIATE FORM - Created new chat with ID: ' . $effectiveChatId);
+                                }
+                            }
+                            
+                            // Get the chat entity first
+                            try {
+                                $chat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)->find($effectiveChatId);
+                                error_log('IMMEDIATE FORM - Repository query completed');
+                            } catch (\Exception $e) {
+                                error_log('IMMEDIATE FORM ERROR - Repository query failed: ' . $e->getMessage());
+                                error_log('IMMEDIATE FORM ERROR - Repository error file: ' . $e->getFile() . ':' . $e->getLine());
+                                throw $e;
+                            }
+                            
+                            if (!$chat) {
+                                error_log('IMMEDIATE FORM ERROR - Chat not found for ID: ' . $effectiveChatId);
+                                throw new \Exception('Chat not found');
+                            }
+                            error_log('IMMEDIATE FORM - Chat entity found: ' . $chat->getId());
+                            
+                            // Pass the full action array (not just the ID) to match the existing form system
+                            error_log('IMMEDIATE FORM - Calling startForm with action: ' . json_encode($immediateFormAction));
+                            $formStartResult = $chatFormProcessor->startForm($chat, $immediateFormAction);
+                            error_log('IMMEDIATE FORM - startForm result: ' . json_encode($formStartResult));
+                            
+                            if ($formStartResult && !isset($formStartResult['error'])) {
+                                error_log('IMMEDIATE FORM SUCCESS - Returning form start result');
+                                
+                                // Check if this is a simple_form that should show all fields at once
+                                if (isset($formStartResult['type']) && $formStartResult['type'] === 'simple_form_started') {
+                                    error_log('IMMEDIATE FORM - Simple form detected, returning simple_form_started response');
+                                    // For simple_form, return the result as-is
+                                    $response = $formStartResult;
+                                    $response['chat_id'] = $effectiveChatId; // Ensure chat_id is included
+                                } else {
+                                    error_log('IMMEDIATE FORM - Progressive form detected, returning form_started response');
+                                    // For progressive forms, format as form_started
+                                    $response = [
+                                        'type' => 'form_started',
+                                        'content' => $formStartResult['question'],
+                                        'chat_id' => $effectiveChatId,
+                                        'step_data' => [
+                                            'field_key' => $formStartResult['stepKey'],
+                                            'field_type' => $formStartResult['fieldType'],
+                                            'options' => $formStartResult['options'] ?? null,
+                                            'validation' => $formStartResult['validation'] ?? [],
+                                            'placeholder' => $formStartResult['placeholder'] ?? null
+                                        ],
+                                        'progress' => [
+                                            'current_step' => 1,
+                                            'total_steps' => count($immediateFormAction['formSteps']),
+                                            'percentage' => 0
+                                        ],
+                                        'is_form_active' => true
+                                    ];
+                                }
+                                
+                                error_log('IMMEDIATE FORM SUCCESS - Response data: ' . json_encode($response));
+                                
+                                // Update chatId for any later use in the main method
+                                $chatId = $effectiveChatId;
+                                
+                                error_log('IMMEDIATE FORM SUCCESS - About to return JsonResponse');
+                                return new JsonResponse($response);
+                            } else {
+                                error_log('IMMEDIATE FORM ERROR - startForm returned invalid result: ' . json_encode($formStartResult));
+                            }
+                        } catch (\Exception $e) {
+                            error_log('IMMEDIATE FORM EXCEPTION - Error starting immediate form: ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM EXCEPTION - Stack trace: ' . $e->getTraceAsString());
+                            // Fall through to show regular response with buttons
+                            error_log('IMMEDIATE FORM EXCEPTION - Falling through to show regular response');
+                        }
+                    } else {
+                        error_log('NO IMMEDIATE FORM - No action with show_immediately: true found');
+                    }
+                    
+                    error_log('AFTER IMMEDIATE FORM CHECK - About to set responseData actions');
                     $responseData['actions'] = $suggestedActions;
                 }
 
-                // Add chat ID if a new chat was created
-                if ($chatId) {
+                // Add chat ID if a new chat was created (but not for welcome generation)
+                if ($chatId && !$isWelcomeRequest) {
                     $responseData['chat_id'] = $chatId;
                 }
+
+                error_log('FINAL RESPONSE - Returning response with ' . count($suggestedActions) . ' actions');
+                error_log('FINAL RESPONSE - Response data: ' . json_encode($responseData));
 
                 return new JsonResponse($responseData);
 
             } else {
                 // Basic Mode: Use regular AiAgent or direct AI call for welcome messages
-                if (strpos($message, 'Generate a short, friendly welcome message') !== false) {
-                    // This is a welcome message request - use direct AI call with the welcome prompt
+                if (strpos($message, 'Generate a friendly welcome message') !== false || strpos($message, 'Generate a short, friendly welcome message') !== false) {
+                    // This is a welcome message request - use direct AI call without action instructions
+                    // Don't create chat records or save welcome messages here - only when user actually engages
+                    
                     $aiProvider = new \NeuronAI\Providers\OpenAI\OpenAI(
-                        key: $openaiKey,
-                        model: $openaiModel
+                        key: Config::get('katalysis.ai.open_ai_key'),
+                        model: Config::get('katalysis.ai.open_ai_model')
                     );
 
                     $response = $aiProvider->chat([
@@ -650,7 +897,7 @@ Available documents (with titles and URLs):
                     $responseContent = $response->getContent();
                 } else {
                     // Regular basic mode - use AiAgent
-                    $agent = new AiAgent();
+                    $agent = new AiAgent($this->app);
                     $response = $agent->chat(
                         new UserMessage($message)
                     );
@@ -658,15 +905,261 @@ Available documents (with titles and URLs):
                     $responseContent = $response->getContent();
                 }
 
+                // Extract action IDs from response (same logic as complex mode)
+                $actionIds = [];
+                error_log('AiAgent Response Content: ' . $responseContent);
+                if (preg_match('/\[ACTIONS:([^\]]+)\]/', $responseContent, $matches)) {
+                    $actionIds = array_map('intval', explode(',', $matches[1]));
+                    error_log('Found action IDs: ' . implode(',', $actionIds));
+                    // Remove the action tag from the response content
+                    $responseContent = preg_replace('/\[ACTIONS:[^\]]+\]/', '', $responseContent);
+                    $responseContent = trim($responseContent);
+                } else {
+                    error_log('No ACTIONS tags found in response');
+                }
+
                 $responseData = [
                     'content' => $responseContent,
-                    'metadata' => []
+                    'metadata' => [],
+                    'page_types_used' => [],
+                    'current_page_type' => $pageType ?? '',
+                    'context_info' => [],
+                    'debug_info' => []
                 ];
 
-                // Add chat ID if a new chat was created
-                if ($chatId) {
+                // Process actions for basic mode (same logic as complex mode)
+                $suggestedActions = []; // Initialize empty array
+                $immediateFormAction = null;
+                $entityManager = $this->app->make('Doctrine\ORM\EntityManager'); // Add missing entityManager
+                
+                // Check if this is a welcome message request (backup check)
+                $isWelcomeRequest = $isWelcomeGeneration || 
+                    strpos($message, 'Generate a friendly welcome message') !== false || 
+                    strpos($message, 'Generate a short, friendly welcome message') !== false ||
+                    strpos($message, '{time_of_day}') !== false ||
+                    strpos($message, '{page_title}') !== false;
+                
+                error_log('ASK_AI DEBUG - isWelcomeRequest check result: ' . ($isWelcomeRequest ? 'true' : 'false'));
+                
+                // Ensure we have a chatId for form processing (but not for welcome generation)
+                // Check if formChatId is already available from frontend data
+                $formChatId = $jsonData['chat_id'] ?? null;
+                if (!$chatId && !$isWelcomeRequest) {
+                    // First try to use the chat_id sent from frontend
+                    if ($formChatId) {
+                        $chatId = $formChatId;
+                        error_log('RAG MODE - Using formChatId from frontend: ' . $chatId);
+                    } else if ($sessionId) {
+                        // Fallback to finding existing chat by session ID
+                        error_log('RAG MODE - Looking for existing chat with session ID: ' . $sessionId);
+                        $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+                        $existingChat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)
+                            ->findOneBy(['sessionId' => $sessionId]);
+                        if ($existingChat) {
+                            $chatId = $existingChat->getId();
+                            error_log('RAG MODE - Found existing chat with ID: ' . $chatId . ' for session: ' . $sessionId);
+                        } else {
+                            error_log('RAG MODE - No existing chat found for session ID: ' . $sessionId);
+                        }
+                    } else {
+                        error_log('RAG MODE - No chat_id or session ID provided, cannot look for existing chat');
+                    }
+                    
+                    // Only create new chat if no existing one found
+                    if (!$chatId) {
+                        $chatId = $this->createNewChatRecord($mode, $pageType, $pageTitle, $pageUrl, $sessionId);
+                        error_log('RAG MODE - Created new chat with ID: ' . $chatId);
+                    }
+                }
+                error_log('RAG MODE - chatId value: ' . ($chatId ?? 'NULL')); // Debug chatId
+                
+                // Skip action processing and chat updates for welcome generation
+                if (!$isWelcomeRequest && !empty($actionIds)) {
+                    $actionService = new \KatalysisAiChatBot\ActionService($this->app->make('Doctrine\ORM\EntityManager'));
+                    
+                    foreach ($actionIds as $actionId) {
+                        error_log('AI RESPONSE - Processing action ID: ' . $actionId);
+                        $action = $actionService->getActionById($actionId);
+                        if ($action) {
+                            error_log('AI RESPONSE - Found action: ' . $action->getName() . ' (ID: ' . $action->getId() . ')');
+                            $actionData = [
+                                'id' => $action->getId(),
+                                'name' => $action->getName(),
+                                'icon' => $action->getIcon(),
+                                'triggerInstruction' => $action->getTriggerInstruction(),
+                                'responseInstruction' => $action->getResponseInstruction(),
+                                'actionType' => $action->getActionType(),
+                                'showImmediately' => $action->getShowImmediately(),
+                                'formSteps' => $action->getFormSteps() ? json_decode($action->getFormSteps(), true) : []
+                            ];
+                            
+                            // Check if this is a form action with show_immediately enabled
+                            if (in_array($action->getActionType(), ['form', 'dynamic_form', 'simple_form'])) {
+                                error_log('ACTION CHECK - Action: ' . $action->getName() . ' (ID: ' . $action->getId() . ') - Type: ' . $action->getActionType());
+                                error_log('ACTION CHECK - Show immediately: ' . ($action->getShowImmediately() ? 'true' : 'false'));
+                                
+                                if ($action->getShowImmediately()) {
+                                    error_log('IMMEDIATE FORM FOUND - Action: ' . $action->getName() . ' has show_immediately: true');
+                                    // This action should be shown immediately - store the first one found
+                                    if (!$immediateFormAction) {
+                                        $immediateFormAction = $actionData;
+                                        error_log('IMMEDIATE FORM SET - Setting immediateFormAction to: ' . $action->getName());
+                                    }
+                                } else {
+                                    error_log('ACTION CHECK - Action: ' . $action->getName() . ' does not have show_immediately: true');
+                                }
+                            } else {
+                                error_log('ACTION CHECK - Action: ' . $action->getName() . ' is not a form type: ' . $action->getActionType());
+                            }
+                            
+                            $suggestedActions[] = $actionData;
+                        }
+                    }
+                    
+                    error_log('AFTER ACTION LOOP - immediateFormAction: ' . ($immediateFormAction ? 'SET' : 'NULL'));
+                    error_log('AFTER ACTION LOOP - suggestedActions count: ' . count($suggestedActions));
+                    
+                    // If we have an immediate form action, start it instead of showing buttons
+                    error_log('BEFORE IMMEDIATE FORM CHECK - About to check if immediateFormAction exists');
+                    if ($immediateFormAction) {
+                        error_log('IMMEDIATE FORM PROCESSING - About to start form processing...');
+                        error_log('IMMEDIATE FORM DETECTED - Action: ' . $immediateFormAction['name'] . ' (ID: ' . $immediateFormAction['id'] . ')');
+                        error_log('IMMEDIATE FORM - Form config: ' . json_encode($immediateFormAction['formConfig']));
+                        error_log('IMMEDIATE FORM - Form steps: ' . json_encode($immediateFormAction['formSteps']));
+                        
+                        // Start the form immediately
+                        error_log('IMMEDIATE FORM - About to create ChatFormProcessor...');
+                        try {
+                            $chatFormProcessor = new \KatalysisAiChatBot\ChatFormProcessor($this->app);
+                            error_log('IMMEDIATE FORM - ChatFormProcessor created successfully');
+                        } catch (\Error $e) {
+                            error_log('IMMEDIATE FORM ERROR - Failed to create ChatFormProcessor (Error): ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM ERROR - Stack trace: ' . $e->getTraceAsString());
+                            throw $e; // Re-throw to be caught by outer try-catch
+                        } catch (\Exception $e) {
+                            error_log('IMMEDIATE FORM ERROR - Failed to create ChatFormProcessor (Exception): ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM ERROR - Stack trace: ' . $e->getTraceAsString());
+                            throw $e; // Re-throw to be caught by outer try-catch
+                        } catch (\Throwable $e) {
+                            error_log('IMMEDIATE FORM ERROR - Failed to create ChatFormProcessor (Throwable): ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM ERROR - Stack trace: ' . $e->getTraceAsString());
+                            throw $e; // Re-throw to be caught by outer try-catch
+                        }
+                        
+                        try {
+                            // Use formChatId if chatId is empty
+                            $effectiveChatId = $chatId ?: $formChatId;
+                            
+                            // Validate chat ID before trying to find the entity
+                            if (empty($effectiveChatId)) {
+                                error_log('IMMEDIATE FORM ERROR - Chat ID is empty, looking for existing chat by session ID');
+                                
+                                // First try to find existing chat by session ID
+                                if ($sessionId) {
+                                    $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+                                    $existingChat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)
+                                        ->findOneBy(['sessionId' => $sessionId]);
+                                    if ($existingChat) {
+                                        $effectiveChatId = $existingChat->getId();
+                                        error_log('IMMEDIATE FORM - Found existing chat with ID: ' . $effectiveChatId . ' for session: ' . $sessionId);
+                                    }
+                                }
+                                
+                                // Only create new chat if no existing one found
+                                if (empty($effectiveChatId)) {
+                                    $effectiveChatId = $this->createNewChatRecord($mode, $pageType, $pageTitle, $pageUrl, $sessionId);
+                                    if (!$effectiveChatId) {
+                                        error_log('IMMEDIATE FORM ERROR - Failed to create new chat record');
+                                        throw new \Exception('Failed to create new chat record');
+                                    }
+                                    error_log('IMMEDIATE FORM - Created new chat with ID: ' . $effectiveChatId);
+                                }
+                            }
+                            
+                            // Get the chat entity first
+                            try {
+                                $chat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)->find($effectiveChatId);
+                                error_log('IMMEDIATE FORM - Repository query completed');
+                            } catch (\Exception $e) {
+                                error_log('IMMEDIATE FORM ERROR - Repository query failed: ' . $e->getMessage());
+                                error_log('IMMEDIATE FORM ERROR - Repository error file: ' . $e->getFile() . ':' . $e->getLine());
+                                throw $e;
+                            }
+                            
+                            if (!$chat) {
+                                error_log('IMMEDIATE FORM ERROR - Chat not found for ID: ' . $effectiveChatId);
+                                throw new \Exception('Chat not found');
+                            }
+                            error_log('IMMEDIATE FORM - Chat entity found: ' . $chat->getId());
+                            
+                            // Pass the full action array (not just the ID) to match the existing form system
+                            error_log('IMMEDIATE FORM - Calling startForm with action: ' . json_encode($immediateFormAction));
+                            $formStartResult = $chatFormProcessor->startForm($chat, $immediateFormAction);
+                            error_log('IMMEDIATE FORM - startForm result: ' . json_encode($formStartResult));
+                            
+                            if ($formStartResult && !isset($formStartResult['error'])) {
+                                error_log('IMMEDIATE FORM SUCCESS - Returning form start result');
+                                
+                                // Check if this is a simple_form that should show all fields at once
+                                if (isset($formStartResult['type']) && $formStartResult['type'] === 'simple_form_started') {
+                                    error_log('IMMEDIATE FORM - Simple form detected, returning simple_form_started response');
+                                    // For simple_form, return the result as-is
+                                    $response = $formStartResult;
+                                    $response['chat_id'] = $effectiveChatId; // Ensure chat_id is included
+                                } else {
+                                    error_log('IMMEDIATE FORM - Progressive form detected, returning form_started response');
+                                    // For progressive forms, format as form_started
+                                    $response = [
+                                        'type' => 'form_started',
+                                        'content' => $formStartResult['question'],
+                                        'chat_id' => $effectiveChatId,
+                                        'step_data' => [
+                                            'field_key' => $formStartResult['stepKey'],
+                                            'field_type' => $formStartResult['fieldType'],
+                                            'options' => $formStartResult['options'] ?? null,
+                                            'validation' => $formStartResult['validation'] ?? [],
+                                            'placeholder' => $formStartResult['placeholder'] ?? null
+                                        ],
+                                        'progress' => [
+                                            'current_step' => 1,
+                                            'total_steps' => count($immediateFormAction['formSteps']),
+                                            'percentage' => 0
+                                        ],
+                                        'is_form_active' => true
+                                    ];
+                                }
+                                
+                                error_log('IMMEDIATE FORM SUCCESS - Response data: ' . json_encode($response));
+                                
+                                // Update chatId for any later use in the main method
+                                $chatId = $effectiveChatId;
+                                
+                                error_log('IMMEDIATE FORM SUCCESS - About to return JsonResponse');
+                                return new JsonResponse($response);
+                            } else {
+                                error_log('IMMEDIATE FORM ERROR - startForm returned invalid result: ' . json_encode($formStartResult));
+                            }
+                        } catch (\Exception $e) {
+                            error_log('IMMEDIATE FORM EXCEPTION - Error starting immediate form: ' . $e->getMessage());
+                            error_log('IMMEDIATE FORM EXCEPTION - Stack trace: ' . $e->getTraceAsString());
+                            // Fall through to show regular response with buttons
+                            error_log('IMMEDIATE FORM EXCEPTION - Falling through to show regular response');
+                        }
+                    } else {
+                        error_log('NO IMMEDIATE FORM - No action with show_immediately: true found');
+                    }
+                    
+                    error_log('AFTER IMMEDIATE FORM CHECK - About to set responseData actions');
+                    $responseData['actions'] = $suggestedActions;
+                }
+
+                // Add chat ID if a new chat was created (but not for welcome generation)
+                if ($chatId && !$isWelcomeRequest) {
                     $responseData['chat_id'] = $chatId;
                 }
+
+                error_log('FINAL RESPONSE - Returning response with ' . count($suggestedActions) . ' actions');
+                error_log('FINAL RESPONSE - Response data: ' . json_encode($responseData));
 
                 return new JsonResponse($responseData);
             }
@@ -763,7 +1256,7 @@ Available documents (with titles and URLs):
     /**
      * Create a new chat record in the database
      */
-    private function createNewChatRecord(string $mode, ?string $pageType, ?string $pageTitle, ?string $pageUrl): ?int
+    private function createNewChatRecord(string $mode, ?string $pageType, ?string $pageTitle, ?string $pageUrl, ?string $sessionId = null): ?int
     {
         try {
             $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
@@ -809,6 +1302,14 @@ Available documents (with titles and URLs):
             $user = new \Concrete\Core\User\User();
             if ($user && $user->isRegistered()) {
                 $chat->setCreatedBy($user->getUserID());
+            }
+            
+            // Set session ID if provided
+            if ($sessionId) {
+                $chat->setSessionId($sessionId);
+                error_log('CREATE CHAT - Setting session ID: ' . $sessionId . ' for new chat');
+            } else {
+                error_log('CREATE CHAT - No session ID provided for new chat');
             }
             
             // Persist the chat record
@@ -1109,34 +1610,42 @@ Available documents (with titles and URLs):
         try {
             $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
             
-            // Always create a new chat record for each session
-            // This ensures that clearing chat history creates a new database record
-            $chat = new \KatalysisAiChatBot\Entity\Chat();
-            
-            // Set chat record properties
-            $chat->setStarted(new \DateTime());
-            $chat->setLocation($this->getUserGeographicalLocation());
-            $chat->setLlm('gpt-4');
-            $chat->setLaunchPageTitle($pageTitle);
-            $chat->setLaunchPageUrl($pageUrl);
-            $chat->setLaunchPageType($pageType);
-            $chat->setCreatedDate(new \DateTime());
-            $chat->setUtmSource('chatbot_block');
-            $chat->setUtmMedium('chatbot');
-            $chat->setUtmCampaign('website_chat');
-            $chat->setUtmTerm($chatbotId);
-            $chat->setUtmContent('block_chat');
-            $chat->setSessionId($sessionId);
-            
-            // Set created by (current user or null if not logged in)
-            $user = new \Concrete\Core\User\User();
-            if ($user && $user->isRegistered()) {
-                $chat->setCreatedBy($user->getUserID());
+            // Check if there's already an existing chat record for this session
+            $chat = null;
+            if (!empty($sessionId)) {
+                $chat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)
+                    ->findOneBy(['sessionId' => $sessionId]);
             }
             
-            // Persist the chat record
-            $entityManager->persist($chat);
-            $entityManager->flush();
+            // Only create a new chat record if one doesn't already exist for this session
+            if (!$chat) {
+                $chat = new \KatalysisAiChatBot\Entity\Chat();
+                
+                // Set chat record properties (only for new chats)
+                $chat->setStarted(new \DateTime());
+                $chat->setLocation($this->getUserGeographicalLocation());
+                $chat->setLlm('gpt-4');
+                $chat->setLaunchPageTitle($pageTitle);
+                $chat->setLaunchPageUrl($pageUrl);
+                $chat->setLaunchPageType($pageType);
+                $chat->setCreatedDate(new \DateTime());
+                $chat->setUtmSource('chatbot_block');
+                $chat->setUtmMedium('chatbot');
+                $chat->setUtmCampaign('website_chat');
+                $chat->setUtmTerm($chatbotId);
+                $chat->setUtmContent('block_chat');
+                $chat->setSessionId($sessionId);
+                
+                // Set created by (current user or null if not logged in)
+                $user = new \Concrete\Core\User\User();
+                if ($user && $user->isRegistered()) {
+                    $chat->setCreatedBy($user->getUserID());
+                }
+                
+                // Persist the new chat record
+                $entityManager->persist($chat);
+                $entityManager->flush();
+            }
             
             return $chat->getId();
             
@@ -1205,6 +1714,606 @@ Available documents (with titles and URLs):
             
         } catch (\Exception $e) {
             \Log::addError('Failed to log chat messages: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle form processing responses
+     */
+    private function handleFormResponse($formResult)
+    {
+        switch ($formResult['type']) {
+            case 'next_step':
+                $step = $formResult['step'];
+                $progress = $formResult['progress'];
+                
+                return new JsonResponse([
+                    'type' => 'form_step',
+                    'content' => $step['question'],
+                    'step_data' => [
+                        'field_key' => $step['stepKey'],
+                        'field_type' => $step['fieldType'],
+                        'options' => $step['options'] ?? null,
+                        'validation' => $step['validation'] ?? [],
+                        'placeholder' => $step['placeholder'] ?? null
+                    ],
+                    'progress' => $progress,
+                    'is_form_active' => true
+                ]);
+                
+            case 'form_complete':
+                $completionAction = $formResult['completion_action'];
+                
+                // Generate AI response using the response instruction as a prompt
+                $followupMessage = $completionAction['followup_message'] ?? null;
+                $responseInstruction = $completionAction['response_instruction'] ?? $formResult['message'] ?? null;
+                
+                if (!empty($followupMessage)) {
+                    // Use the generated followup message if available
+                    $aiResponseContent = $followupMessage;
+                } elseif (!empty($responseInstruction)) {
+                    // Try to generate AI response using the response instruction
+                    try {
+                        // Create context with form data
+                        $formDataSummary = '';
+                        if (!empty($formResult['collected_data'])) {
+                            $formDataSummary = "Based on the form submission:\n";
+                            foreach ($formResult['collected_data'] as $key => $value) {
+                                $formDataSummary .= "- " . ucfirst(str_replace('_', ' ', $key)) . ": " . $value . "\n";
+                            }
+                            $formDataSummary .= "\n";
+                        }
+                        
+                        $aiPrompt = $formDataSummary . $responseInstruction;
+                        
+                        // Use RagAgent instead of AiAgent since it works more reliably
+                        $ragAgent = new RagAgent();
+                        $ragAgent->setApp($this->app);
+                        $response = $ragAgent->answer(new UserMessage($aiPrompt));
+                        $rawContent = $response->getContent();
+                        
+                        // Remove ACTIONS tags from form completion responses
+                        $aiResponseContent = preg_replace('/\s*\[ACTIONS:[^\]]*\]/', '', $rawContent);
+                        
+                    } catch (\Exception $e) {
+                        // AI generation failed, use fallback completion message
+                        $userName = $formResult['collected_data']['name'] ?? '';
+                        if ($userName) {
+                            $aiResponseContent = "Thank you " . $userName . " for completing the form! We'll review your information and get back to you soon.";
+                        } else {
+                            $aiResponseContent = "Thank you for completing the form! We'll review your information and get back to you soon.";
+                        }
+                    }
+                } else {
+                    // No instruction available, use default
+                    $aiResponseContent = 'Thank you for completing the form!';
+                }
+                
+                // Process completion action
+                $response = [
+                    'type' => 'form_complete',
+                    'content' => $aiResponseContent,
+                    'completion_action' => $completionAction['action'],
+                    'collected_data' => $formResult['collected_data']
+                ];
+                
+                // Add follow-up actions based on AI decision
+                if ($completionAction['action'] === 'schedule_demo') {
+                    $response['actions'] = [
+                        [
+                            'id' => 'demo_calendar',
+                            'name' => 'Schedule Demo',
+                            'icon' => 'fas fa-calendar-alt'
+                        ]
+                    ];
+                } elseif ($completionAction['action'] === 'send_pricing') {
+                    $response['actions'] = [
+                        [
+                            'id' => 'pricing_info',
+                            'name' => 'Get Pricing',
+                            'icon' => 'fas fa-dollar-sign'
+                        ]
+                    ];
+                }
+                
+                return new JsonResponse($response);
+                
+            case 'validation_error':
+                return new JsonResponse([
+                    'type' => 'form_validation_error',
+                    'content' => $formResult['error'],
+                    'step_data' => [
+                        'field_key' => $formResult['step']['stepKey'],
+                        'field_type' => $formResult['step']['fieldType'],
+                        'options' => $formResult['step']['options'] ?? null,
+                        'validation' => $formResult['step']['validation'] ?? []
+                    ],
+                    'is_form_active' => true
+                ]);
+                
+            default:
+                return new JsonResponse([
+                    'error' => 'Unknown form response type'
+                ], 500);
+        }
+    }
+    
+    /**
+     * Start a form from an action
+     */
+    public function start_form()
+    {
+        try {
+            $request = $this->app->make('request');
+            $jsonData = json_decode($request->getContent(), true);
+            
+            error_log('start_form request data: ' . print_r($jsonData, true));
+            
+            $actionId = $jsonData['action_id'] ?? null;
+            $chatId = $jsonData['chat_id'] ?? null;
+            $sessionId = $jsonData['session_id'] ?? null;
+            
+            if (!$actionId) {
+                return new JsonResponse(['error' => 'Missing action ID'], 400);
+            }
+            
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            
+            // If no chat ID provided, try to find existing chat by session ID before creating new
+            if (!$chatId) {
+                if ($sessionId) {
+                    $chat = $entityManager->getRepository(Chat::class)
+                        ->findOneBy(['sessionId' => $sessionId]);
+                    if ($chat) {
+                        $chatId = $chat->getId();
+                        error_log('start_form - Found existing chat with ID: ' . $chatId . ' for session: ' . $sessionId);
+                    }
+                }
+                
+                // Only create new chat if no existing one found
+                if (!$chatId) {
+                    $chat = new Chat();
+                    $chat->setUserId(0); // Anonymous user for now
+                    $chat->setMode('form');
+                    $chat->setConversationHistory('[]');
+                    $chat->setStartTime(new \DateTime());
+                    if ($sessionId) {
+                        $chat->setSessionId($sessionId);
+                    }
+                    
+                    $entityManager->persist($chat);
+                    $entityManager->flush();
+                    $chatId = $chat->getId();
+                    error_log('start_form - Created new chat with ID: ' . $chatId . ' for session: ' . $sessionId);
+                }
+            } else {
+                $chat = $entityManager->getRepository(Chat::class)->find($chatId);
+                if (!$chat) {
+                    return new JsonResponse(['error' => 'Chat not found'], 404);
+                }
+            }
+            
+            // Get the action
+            $actionService = new \KatalysisAiChatBot\ActionService($entityManager);
+            $actionEntity = $actionService->getActionById($actionId);
+            
+            error_log('start_form - Action entity found: ' . ($actionEntity ? 'YES' : 'NO'));
+            if ($actionEntity) {
+                error_log('start_form - Action details: ID=' . $actionEntity->getId() . ', Name=' . $actionEntity->getName() . ', Type=' . $actionEntity->getActionType());
+            }
+            
+            if (!$actionEntity || !in_array($actionEntity->getActionType(), ['form', 'dynamic_form', 'simple_form'])) {
+                error_log('start_form - Invalid form action: ' . ($actionEntity ? $actionEntity->getActionType() : 'NULL'));
+                return new JsonResponse(['error' => 'Invalid form action'], 400);
+            }
+            
+            // Convert action entity to array format expected by form processor
+            $formStepsJson = $actionEntity->getFormSteps();
+            $formSteps = $formStepsJson ? json_decode($formStepsJson, true) : [];
+            
+            error_log('start_form - Form steps JSON: ' . $formStepsJson);
+            error_log('start_form - Form steps decoded: ' . json_encode($formSteps));
+            
+            // Check if action has form steps defined
+            if (empty($formSteps) || !is_array($formSteps)) {
+                error_log('start_form - No form steps defined for action ID: ' . $actionId);
+                return new JsonResponse([
+                    'error' => 'No form steps defined for this action',
+                    'debug_info' => [
+                        'action_id' => $actionId,
+                        'action_name' => $actionEntity->getName(),
+                        'action_type' => $actionEntity->getActionType(),
+                        'form_steps_json' => $formStepsJson,
+                        'form_steps_decoded' => $formSteps,
+                        'form_steps_count' => is_array($formSteps) ? count($formSteps) : 0
+                    ]
+                ], 400);
+            }
+            
+            // Create action array format expected by ChatFormProcessor
+            $action = [
+                'id' => $actionEntity->getId(),
+                'name' => $actionEntity->getName(),
+                'actionType' => $actionEntity->getActionType(),
+                'icon' => $actionEntity->getIcon(),
+                'triggerInstruction' => $actionEntity->getTriggerInstruction(),
+                'responseInstruction' => $actionEntity->getResponseInstruction(),
+                'formSteps' => $formSteps,
+                'showImmediately' => $actionEntity->getShowImmediately()
+            ];
+            
+            error_log('start_form - Action showImmediately setting: ' . ($actionEntity->getShowImmediately() ? 'true' : 'false'));
+            
+            // Note: showImmediately is designed to work when AI suggests actions in ask_ai endpoint
+            // When users click buttons directly, this setting doesn't apply as they're explicitly choosing to start the form
+            // The form will always start immediately when called via start_form endpoint
+            
+            // Handle different form types
+            if ($actionEntity->getActionType() === 'simple_form') {
+                // For simple forms, return all fields at once
+                return new JsonResponse([
+                    'type' => 'simple_form_started',
+                    'content' => 'Please fill out the form below:',
+                    'chat_id' => $chatId,
+                    'action_type' => 'simple_form',
+                    'form_steps' => $formSteps,
+                    'action_id' => $actionId,
+                    'action_name' => $actionEntity->getName(),
+                    'is_form_active' => true
+                ]);
+            } else {
+                // For regular forms, use existing step-by-step logic
+                $formProcessor = new ChatFormProcessor($this->app);
+                error_log('start_form - About to call startForm for action: ' . $actionEntity->getName());
+                $firstStep = $formProcessor->startForm($chat, $action);
+                
+                error_log('start_form - startForm result: ' . json_encode($firstStep));
+                
+                if (!$firstStep) {
+                    error_log('start_form - No form steps returned from startForm');
+                    return new JsonResponse(['error' => 'No form steps defined'], 400);
+                }
+                
+                return new JsonResponse([
+                    'type' => 'form_started',
+                    'content' => $firstStep['question'],
+                    'chat_id' => $chatId,
+                    'step_data' => [
+                        'field_key' => $firstStep['stepKey'],
+                        'field_type' => $firstStep['fieldType'],
+                        'options' => $firstStep['options'] ?? null,
+                        'validation' => $firstStep['validation'] ?? [],
+                        'placeholder' => $firstStep['placeholder'] ?? null
+                    ],
+                    'progress' => [
+                        'current_step' => 1,
+                        'total_steps' => count($action['formSteps']),
+                        'percentage' => 0
+                    ],
+                    'is_form_active' => true
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            error_log('Form start failed: ' . $e->getMessage() . ' | Stack trace: ' . $e->getTraceAsString());
+            
+            // Return JSON error response instead of letting it bubble up as 500 HTML
+            $response = new JsonResponse([
+                'error' => 'Failed to start form: ' . $e->getMessage(),
+                'debug_info' => [
+                    'action_id' => $actionId,
+                    'chat_id' => $chatId,
+                    'error_line' => $e->getLine(),
+                    'error_file' => basename($e->getFile()),
+                    'error_class' => get_class($e)
+                ]
+            ], 400); // Use 400 instead of 500 to ensure JSON response
+            
+            $response->headers->set('Content-Type', 'application/json');
+            return $response;
+        }
+    }
+    
+    /**
+     * Cancel an active form
+     */
+    public function cancel_form()
+    {
+        $request = $this->app->make('request');
+        $jsonData = json_decode($request->getContent(), true);
+        
+        $chatId = $jsonData['chat_id'] ?? null;
+        
+        if (!$chatId) {
+            return new JsonResponse(['error' => 'Missing chat ID'], 400);
+        }
+        
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $chat = $entityManager->getRepository(Chat::class)->find($chatId);
+            
+            if (!$chat) {
+                return new JsonResponse(['error' => 'Chat not found'], 404);
+            }
+            
+            $formProcessor = new ChatFormProcessor($entityManager);
+            $result = $formProcessor->cancelActiveForm($chat);
+            
+            return new JsonResponse([
+                'type' => 'form_cancelled',
+                'content' => $result['message']
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::addError('Form cancellation failed: ' . $e->getMessage());
+            return new JsonResponse(['error' => 'Failed to cancel form'], 500);
+        }
+    }
+    
+    /**
+     * Test endpoint to verify routing works
+     */
+    public function test_endpoint()
+    {
+        error_log('test_endpoint method called');
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'message' => 'Test endpoint works']);
+        exit;
+    }
+
+    /**
+     * Submit simple form with all field data
+     */
+    public function submit_simple_form()
+    {
+        error_log('submit_simple_form method called');
+        
+        // Set error reporting to catch all issues
+        ini_set('display_errors', 1);
+        error_reporting(E_ALL);
+        
+        try {
+            // Get the request object and handle JSON data
+            $request = $this->app->make('request');
+            
+            // Try to get JSON data from request body first
+            $requestContent = $request->getContent();
+            $contentType = $request->headers->get('Content-Type');
+            
+            if (!empty($requestContent)) {
+                // Try to decode as JSON first
+                $jsonData = json_decode($requestContent, true);
+                if ($jsonData === null) {
+                    // JSON decode failed, try $_POST
+                    $jsonData = $_POST;
+                }
+            } else {
+                // No request content, use $_POST
+                $jsonData = $_POST;
+            }
+            
+            error_log('submit_simple_form request data: ' . print_r($jsonData, true));
+            error_log('submit_simple_form raw request content: ' . $request->getContent());
+            error_log('submit_simple_form content type: ' . $contentType);
+            error_log('submit_simple_form json_decode result: ' . ($jsonData === null ? 'NULL' : 'NOT NULL'));
+            
+            $actionId = $jsonData['action_id'] ?? null;
+            $chatId = $jsonData['chat_id'] ?? null;
+            $formData = $jsonData['form_data'] ?? [];
+            $sessionId = $jsonData['session_id'] ?? null; // Add session ID extraction
+            
+            error_log('submit_simple_form parsed values - actionId: ' . ($actionId ?? 'NULL') . ', chatId: ' . ($chatId ?? 'NULL') . ', sessionId: ' . ($sessionId ?? 'NULL'));
+            
+            if (!$actionId) {
+                error_log('submit_simple_form FAILING - actionId is falsy: ' . var_export($actionId, true));
+                $response = new JsonResponse(['error' => 'Missing action ID', 'debug' => [
+                    'received_data' => $jsonData,
+                    'action_id_value' => $actionId,
+                    'action_id_isset' => isset($jsonData['action_id']),
+                    'raw_content' => $request->getContent()
+                ]], 400);
+                $response->send();
+                exit;
+            }
+            
+            if (!$chatId) {
+                return new JsonResponse(['error' => 'Missing chat ID'], 400);
+            }
+            
+            if (empty($formData)) {
+                return new JsonResponse(['error' => 'No form data provided'], 400);
+            }
+            
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            
+            // Get the action and chat
+            $actionService = new \KatalysisAiChatBot\ActionService($entityManager);
+            $actionEntity = $actionService->getActionById($actionId);
+            
+            if (!$actionEntity || $actionEntity->getActionType() !== 'simple_form') {
+                return new JsonResponse(['error' => 'Invalid simple form action'], 400);
+            }
+            
+            $chat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)->find($chatId);
+            if (!$chat) {
+                error_log('submit_simple_form - Chat not found for ID: ' . $chatId . ', trying to find by session ID: ' . ($sessionId ?? 'NULL'));
+                
+                // If chat not found and we have a session ID, try to find existing chat by session
+                if ($sessionId) {
+                    $existingChat = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Chat::class)
+                        ->findOneBy(['sessionId' => $sessionId]);
+                    if ($existingChat) {
+                        $chat = $existingChat;
+                        $chatId = $existingChat->getId();
+                        error_log('submit_simple_form - Found existing chat by session ID: ' . $chatId);
+                    }
+                }
+                
+                if (!$chat) {
+                    return new JsonResponse(['error' => 'Chat not found'], 404);
+                }
+            } else {
+                error_log('submit_simple_form - Using provided chat ID: ' . $chatId);
+            }
+            
+            // Validate form data against form steps
+            $formStepsJson = $actionEntity->getFormSteps();
+            $formSteps = $formStepsJson ? json_decode($formStepsJson, true) : [];
+            
+            if (empty($formSteps)) {
+                return new JsonResponse(['error' => 'No form steps defined'], 400);
+            }
+            
+            // Validate all required fields are provided
+            $errors = [];
+            foreach ($formSteps as $step) {
+                $fieldKey = $step['field_key'] ?? $step['stepKey'] ?? null;
+                if (!$fieldKey) continue;
+                
+                $required = ($step['validation']['required'] ?? true) !== false;
+                $value = $formData[$fieldKey] ?? '';
+                
+                if ($required && empty($value)) {
+                    $errors[] = "Field '{$fieldKey}' is required";
+                }
+            }
+            
+            if (!empty($errors)) {
+                return new JsonResponse([
+                    'error' => 'Validation failed',
+                    'validation_errors' => $errors
+                ], 400);
+            }
+            
+            // Store the form submission in chat history
+            $historyArray = json_decode($chat->getCompleteChatHistory(), true) ?? [];
+            
+            // Add form submission to history
+            $formattedData = '';
+            foreach ($formData as $key => $value) {
+                $displayKey = ucfirst(str_replace('_', ' ', $key));
+                $formattedData .= "{$displayKey}: {$value}\n";
+            }
+            
+            $submissionRecord = [
+                'sender' => 'user',
+                'content' => "Form Submitted - {$actionEntity->getName()}:\n{$formattedData}",
+                'timestamp' => time() * 1000, // Convert to milliseconds for consistency
+                'type' => 'simple_form_submission',
+                'action_id' => $actionId,
+                'form_data' => $formData
+            ];
+            $historyArray[] = $submissionRecord;
+            
+            // Generate a personalized confirmation message
+            $responseInstruction = $actionEntity->getResponseInstruction();
+            
+            if (!empty($responseInstruction)) {
+                // Use the response instruction to create a personalized message
+                $userName = $formData['name'] ?? $formData['Name'] ?? '';
+                
+                // Create a confirmation message based on the response instruction
+                if (stripos($responseInstruction, 'thank') !== false && stripos($responseInstruction, 'touch') !== false) {
+                    $responseMessage = "Thank you" . (!empty($userName) ? ", {$userName}," : "") . " for your form submission! We'll be in touch soon to arrange a convenient time. Is there anything else I can help you with?";
+                } elseif (stripos($responseInstruction, 'thank') !== false) {
+                    $responseMessage = "Thank you" . (!empty($userName) ? ", {$userName}," : "") . " for submitting the form! Your request has been received and we'll respond shortly.";
+                } else {
+                    // Use the response instruction with placeholder replacement
+                    $processedResponse = $responseInstruction;
+                    foreach ($formData as $key => $value) {
+                        $processedResponse = str_replace("{{$key}}", $value, $processedResponse);
+                        $processedResponse = str_replace("{{" . strtoupper($key) . "}}", $value, $processedResponse);
+                    }
+                    $responseMessage = $processedResponse;
+                }
+            } else {
+                // Default confirmation message
+                $userName = $formData['name'] ?? $formData['Name'] ?? '';
+                $responseMessage = "Thank you" . (!empty($userName) ? ", {$userName}," : "") . " for your form submission! We'll be in touch soon.";
+            }
+            
+            // Add the confirmation message to chat history
+            $confirmationRecord = [
+                'sender' => 'ai',
+                'content' => $responseMessage,
+                'timestamp' => time() * 1000, // Convert to milliseconds for consistency
+                'type' => 'simple_form_confirmation'
+            ];
+            $historyArray[] = $confirmationRecord;
+            
+            // Update chat history with both form submission and confirmation
+            $chat->setCompleteChatHistory(json_encode($historyArray));
+            
+            // Update the lastMessage field with the confirmation response
+            $chat->setLastMessage($responseMessage);
+            
+            $entityManager->persist($chat);
+            $entityManager->flush();
+            
+            $response = new JsonResponse([
+                'success' => true,
+                'message' => $responseMessage,
+                'chat_id' => $chat->getId(),
+                'submission_id' => $chat->getId() . '_' . time()
+            ]);
+            $response->send();
+            exit;
+            
+        } catch (\Throwable $e) {
+            error_log('Simple form submission failed: ' . $e->getMessage() . ' | Stack trace: ' . $e->getTraceAsString());
+            
+            // Ensure we always return JSON
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Failed to submit form: ' . $e->getMessage(),
+                'debug_info' => [
+                    'action_id' => $actionId ?? 'undefined',
+                    'chat_id' => $chatId ?? 'undefined',
+                    'error_line' => $e->getLine(),
+                    'error_file' => basename($e->getFile()),
+                    'error_class' => get_class($e)
+                ]
+            ]);
+            exit;
+        }
+    }
+    
+    /**
+     * Get action information
+     */
+    public function get_action_info()
+    {
+        $request = $this->app->make('request');
+        $jsonData = json_decode($request->getContent(), true);
+        
+        $actionId = $jsonData['action_id'] ?? null;
+        
+        if (!$actionId) {
+            return new JsonResponse(['error' => 'Missing action ID'], 400);
+        }
+        
+        try {
+            $entityManager = $this->app->make('Doctrine\ORM\EntityManager');
+            $action = $entityManager->getRepository(\KatalysisAiChatBot\Entity\Action::class)->find($actionId);
+            
+            if (!$action) {
+                return new JsonResponse(['error' => 'Action not found'], 404);
+            }
+            
+            return new JsonResponse([
+                'id' => $action->getId(),
+                'name' => $action->getName(),
+                'actionType' => $action->getActionType() ?: 'basic',
+                'icon' => $action->getIcon(),
+                'triggerInstruction' => $action->getTriggerInstruction(),
+                'responseInstruction' => $action->getResponseInstruction(),
+                'showImmediately' => $action->getShowImmediately()
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::addError('Get action info failed: ' . $e->getMessage());
+            return new JsonResponse(['error' => 'Failed to get action info'], 500);
         }
     }
 }

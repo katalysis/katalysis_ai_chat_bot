@@ -46,7 +46,6 @@ window.currentPage = {
     page_url: '<?php echo addslashes($pageUrl); ?>'
 };
 
-console.log('Page context loaded:', window.currentPage);
 </script>
 
 <!-- Chat Widget JavaScript -->
@@ -118,14 +117,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 addMessage('ai', data.content);
                 
                 // Debug: Log the response data
-                console.log('AI Response Data:', data);
                 
                 // Display action buttons if provided
                 if (data.actions && data.actions.length > 0) {
-                    console.log('Found actions:', data.actions);
                     displayActionButtons(data.actions);
                 } else {
-                    console.log('No actions found in response');
                 }
                 
                 // Add "More Info" links if available
@@ -140,7 +136,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
             
             // Remove loading message
             const loadingMessage = chatMessages.querySelector('.loading');
@@ -154,11 +149,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Display action buttons
     function displayActionButtons(actions) {
-        console.log('displayActionButtons called with:', actions);
         actionButtons.innerHTML = '';
         
         actions.forEach(action => {
-            console.log('Creating button for action:', action);
             const button = document.createElement('button');
             button.className = 'action-button';
             button.innerHTML = `<i class="${action.icon}"></i> ${action.name}`;
@@ -173,7 +166,6 @@ document.addEventListener('DOMContentLoaded', function() {
             actionButtons.appendChild(button);
         });
         
-        console.log('Setting actionButtons display to flex');
         actionButtons.style.display = 'flex';
         
         // Add a debug indicator
@@ -234,7 +226,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
             
             // Remove loading message
             const loadingMessage = chatMessages.querySelector('.loading');

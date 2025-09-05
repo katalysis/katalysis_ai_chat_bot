@@ -46,7 +46,7 @@ class RagAgent extends RAG
     {
         return new FileVectorStore(
             directory: DIR_APPLICATION . '/files/neuron',
-            topK: 8  // Increased from 4 to 8 for better search results
+            topK: 2  // Further reduced to prevent token limit issues
         );
     }
 
@@ -55,7 +55,7 @@ class RagAgent extends RAG
         return new FileChatHistory(
             directory: DIR_APPLICATION . '/files/neuron',
             key: '1', // The key allow to store different files to separate conversations
-            contextWindow: 50000
+            contextWindow: 10000  // Further reduced to prevent token limit issues
         );
     }
 

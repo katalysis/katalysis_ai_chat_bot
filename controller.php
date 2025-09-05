@@ -17,7 +17,7 @@ class Controller extends Package
 {
     protected $pkgHandle = 'katalysis_ai_chat_bot';
     protected $appVersionRequired = '9.3';
-    protected $pkgVersion = '0.1.11';
+    protected $pkgVersion = '0.1.13';
         protected $pkgAutoloaderRegistries = [
         'src' => 'KatalysisAiChatBot'
     ];
@@ -38,6 +38,9 @@ class Controller extends Package
         ),
         '/dashboard/katalysis_ai_chat_bot/actions' => array(
             'cName' => 'Actions'
+        ),
+        '/dashboard/katalysis_ai_chat_bot/create_sample_forms' => array(
+            'cName' => 'Create Sample Forms'
         ),
         '/dashboard/katalysis_ai_chat_bot/chat_bot_settings' => array(
             'cName' => 'Chat Bot Settings'
@@ -74,6 +77,7 @@ class Controller extends Package
 
         $al = AssetList::getInstance();
         $al->register('css', 'katalysis-ai', 'css/katalysis-ai.css', ['version' => $version, 'position' => Asset::ASSET_POSITION_HEADER, 'minify' => false, 'combine' => false], $this);
+        $al->register('javascript', 'katalysis-ai-chat-forms', 'js/chat-forms.js', ['version' => $version, 'position' => Asset::ASSET_POSITION_FOOTER, 'minify' => false, 'combine' => false], $this);
         
         $manager = $this->app->make(TaskManager::class);
 		$manager->extend('build_rag_index', function () {
@@ -167,4 +171,5 @@ class Controller extends Package
             }
         }
     }
+
 }
