@@ -58,6 +58,24 @@ class Action
      */
     protected $createdDate;
 
+    /**
+     * @var string
+     * @ORM\Column(name="`actionType`", type="string", nullable=true)
+     */
+    protected $actionType = 'basic';
+
+    /**
+     * @var string
+     * @ORM\Column(name="`formSteps`", type="text", nullable=true)
+     */
+    protected $formSteps = '';
+
+    /**
+     * @var boolean
+     * @ORM\Column(name="`showImmediately`", type="boolean", nullable=false, options={"default"=false})
+     */
+    protected $showImmediately = false;
+
     
     /**
      * @return integer
@@ -113,6 +131,30 @@ class Action
     public function getCreatedDate()
     {
         return $this->createdDate;
+    }
+
+    /**
+     * @return string
+     */
+    public function getActionType()
+    {
+        return $this->actionType;
+    }
+
+    /**
+     * @return string
+     */
+    public function getFormSteps()
+    {
+        return $this->formSteps;
+    }
+
+    /**
+     * @return boolean
+     */
+    public function getShowImmediately()
+    {
+        return $this->showImmediately;
     }
 
     
@@ -183,6 +225,36 @@ class Action
     public function setCreatedDate($createdDate)
     {
         $this->createdDate = $createdDate;
+         return $this;
+    }
+
+    /**
+     * @param string $actionType
+     * @return Action
+     */
+    public function setActionType($actionType)
+    {
+        $this->actionType = $actionType;
+         return $this;
+    }
+
+    /**
+     * @param string $formSteps
+     * @return Action
+     */
+    public function setFormSteps($formSteps)
+    {
+        $this->formSteps = $formSteps;
+         return $this;
+    }
+
+    /**
+     * @param boolean $showImmediately
+     * @return Action
+     */
+    public function setShowImmediately($showImmediately)
+    {
+        $this->showImmediately = (bool)$showImmediately;
          return $this;
     }
 

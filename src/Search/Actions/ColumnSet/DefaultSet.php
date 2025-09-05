@@ -16,6 +16,7 @@ namespace KatalysisAiChatBot\Search\Actions\ColumnSet;
 use KatalysisAiChatBot\Search\Actions\ColumnSet\Column\IdColumn;
 use KatalysisAiChatBot\Search\Actions\ColumnSet\Column\NameColumn;
 use KatalysisAiChatBot\Search\Actions\ColumnSet\Column\IconColumn;
+use KatalysisAiChatBot\Search\Actions\ColumnSet\Column\ActionTypeColumn;
 use KatalysisAiChatBot\Search\Actions\ColumnSet\Column\TriggerInstructionColumn;
 
 
@@ -28,6 +29,7 @@ class DefaultSet extends ColumnSet
         $this->addColumn(new IdColumn());
         $this->addColumn(new NameColumn());
         $this->addColumn(new IconColumn());
+        $this->addColumn(new ActionTypeColumn());
         $this->addColumn(new TriggerInstructionColumn());
         $id = $this->getColumnByKey('a.id');
         $this->setDefaultSortColumn($id, 'desc');

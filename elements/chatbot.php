@@ -39,8 +39,6 @@
                     }
                 </script>
                 <script>
-                    console.log('=== CHAT SCRIPT LOADED ===');
-                    console.log('Current time:', new Date().toISOString());
 
                     // Initialize currentMode variable
                     let currentMode = 'rag'; // Default to RAG mode
@@ -49,15 +47,12 @@
 
                     // Function to regenerate welcome message (resets flag and calls generateAIWelcomeMessage)
                     function regenerateWelcomeMessage() {
-                        console.log('Regenerating welcome message...');
                         welcomeMessageGenerated = false;
                         generateAIWelcomeMessage();
                     }
 
                     // Function to generate AI-powered welcome message
                     function generateAIWelcomeMessage() {
-                        console.log('generateAIWelcomeMessage called');
-                        console.log('welcomeMessageGenerated flag:', welcomeMessageGenerated);
                         
                         const now = new Date();
                         const hour = now.getHours();
@@ -78,15 +73,10 @@
                             if (debugPageUrl) pageUrl = debugPageUrl;
                         }
 
-                        console.log('Page context - Title:', pageTitle, 'URL:', pageUrl, 'Type:', pageType);
 
                         // Get the configurable welcome message prompt from the textarea
                         let welcomePrompt = document.getElementById('welcome_message_prompt').value || `<?php echo addslashes($welcomeMessagePrompt); ?>`;
                         
-                        console.log('=== WELCOME MESSAGE DEBUG ===');
-                        console.log('Textarea value:', document.getElementById('welcome_message_prompt').value);
-                        console.log('PHP fallback value:', `<?php echo addslashes($welcomeMessagePrompt); ?>`);
-                        console.log('Final welcomePrompt before replacements:', welcomePrompt);
                         
                         // Replace placeholders with actual values
                         welcomePrompt = welcomePrompt.replace(/{time_of_day}/g, hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening');
@@ -96,9 +86,6 @@
                         // Append essential formatting instructions
                         welcomePrompt += `<?php echo addslashes($essentialWelcomeMessageInstructions); ?>`;
 
-                        console.log('Welcome prompt prepared:', welcomePrompt.substring(0, 200) + '...');
-                        console.log('Full welcome prompt:', welcomePrompt);
-                        console.log('=== END WELCOME MESSAGE DEBUG ===');
 
                         // Prepare request data with debug context if enabled
                         let requestData = {
@@ -118,11 +105,9 @@
                                     page_type: debugPageType,
                                     page_url: debugPageUrl
                                 };
-                                console.log('Adding debug context to welcome message request:', requestData.debug_context);
                             }
                         }
 
-                        console.log('Sending welcome message request:', requestData);
                         
                         // Use the existing AI system to generate the welcome message
                         $.ajax({
@@ -134,7 +119,6 @@
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('AI Welcome Response:', data);
 
                                 let welcomeText = '';
 
@@ -144,15 +128,11 @@
                                     welcomeText = data;
                                 }
 
-                                console.log('Processed welcome text:', welcomeText);
-                                console.log('Welcome text length:', welcomeText ? welcomeText.length : 0);
 
                                 // Show and animate the welcome response
                                 const welcomeResponse = document.getElementById('welcome-response');
                                 const welcomeElement = document.getElementById('welcome-message');
 
-                                console.log('Welcome response element found:', !!welcomeResponse);
-                                console.log('Welcome message element found:', !!welcomeElement);
 
                                 if (welcomeResponse && welcomeElement) {
                                     // Set the message text
@@ -174,15 +154,9 @@
                                         welcomeResponse.classList.remove('welcome-animate');
                                     }, 600);
                                 } else {
-                                    console.error('Welcome response elements not found!');
-                                    console.error('welcomeResponse:', welcomeResponse);
-                                    console.error('welcomeElement:', welcomeElement);
                                 }
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error generating welcome message:', error);
-                                console.error('Status:', status);
-                                console.error('Response:', xhr.responseText);
                                 
                                 // Show a fallback welcome message on error
                                 const welcomeResponse = document.getElementById('welcome-response');
@@ -215,7 +189,6 @@
                             ragModeToggle.addEventListener('change', function () {
                                 currentMode = this.checked ? 'rag' : 'basic';
                                 updateModeDescription();
-                                console.log('Mode changed to:', currentMode);
                             });
                         }
 
@@ -232,32 +205,25 @@
 
                     // Chat persistence functions
                     function saveChatHistory() {
-                        console.log('Saving chat history...');
 
                         const chatContainer = document.getElementById('chat');
                         if (!chatContainer) {
-                            console.error('Chat container not found!');
                             return;
                         }
 
                         const chatHistory = chatContainer.innerHTML;
-                        console.log('Chat history length:', chatHistory.length);
 
                         try {
                             localStorage.setItem('katalysis_chat_history', chatHistory);
                             localStorage.setItem('katalysis_chat_timestamp', Date.now().toString());
-                            console.log('Chat history saved successfully');
                         } catch (e) {
-                            console.error('Error saving chat history:', e);
                         }
                     }
 
                     function loadChatHistory() {
-                        console.log('Loading chat history...');
 
                         const chatContainer = document.getElementById('chat');
                         if (!chatContainer) {
-                            console.error('Chat container not found!');
                             return;
                         }
 
@@ -265,28 +231,22 @@
                             const savedHistory = localStorage.getItem('katalysis_chat_history');
                             const timestamp = localStorage.getItem('katalysis_chat_timestamp');
 
-                            console.log('Saved history exists:', !!savedHistory);
-                            console.log('Timestamp exists:', !!timestamp);
 
                             if (savedHistory && timestamp) {
                                 const age = Date.now() - parseInt(timestamp);
                                 const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
-                                console.log('Chat age:', age, 'ms');
 
                                 if (age < maxAge) {
-                                    console.log('Loading saved chat history...');
 
                                     // Replace the entire chat container content
                                     chatContainer.innerHTML = savedHistory;
 
-                                    console.log('Chat history loaded successfully');
 
                                     // Check if the loaded chat history contains any messages
                                     const hasMessages = chatContainer.querySelector('.user-message, .ai-response') !== null;
                                     
                                     if (!hasMessages && !welcomeMessageGenerated) {
-                                        console.log('Chat history loaded but no messages found, generating welcome message...');
                                         welcomeMessageGenerated = true;
                                         setTimeout(function () {
                                             generateAIWelcomeMessage();
@@ -298,11 +258,9 @@
                                         scrollToBottom();
                                     }, 100);
                                 } else {
-                                    console.log('Chat history is too old, clearing...');
                                     clearChatHistory();
                                 }
                             } else {
-                                console.log('No saved chat history found');
                                 // If no saved chat history, ensure welcome message is generated
                                 if (!welcomeMessageGenerated) {
                                     welcomeMessageGenerated = true;
@@ -312,7 +270,6 @@
                                 }
                             }
                         } catch (e) {
-                            console.error('Error loading chat history:', e);
                             // If there's an error loading chat history, still try to generate welcome message
                             if (!welcomeMessageGenerated) {
                                 welcomeMessageGenerated = true;
@@ -324,7 +281,6 @@
                     }
 
                     function clearChatHistory() {
-                        console.log('Clearing chat history...');
 
                         // Clear browser localStorage
                         localStorage.removeItem('katalysis_chat_history');
@@ -341,7 +297,6 @@
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('Server chat history cleared:', data);
                                 // Instead of reloading, clear the chat container and generate welcome message
                                 const chatContainer = document.getElementById('chat');
                                 if (chatContainer) {
@@ -372,7 +327,6 @@
                                 }
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error clearing server chat history:', error);
                                 // Still try to clear locally and generate welcome message
                                 const chatContainer = document.getElementById('chat');
                                 if (chatContainer) {
@@ -404,9 +358,6 @@
                     function scrollToBottom() {
                         const chatContainer = document.getElementById('chat');
                         if (chatContainer) {
-                            console.log('Scrolling to bottom...');
-                            console.log('Scroll height:', chatContainer.scrollHeight);
-                            console.log('Client height:', chatContainer.clientHeight);
 
                             // Force scroll to bottom
                             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -427,21 +378,12 @@
                         const welcomeResponse = document.getElementById('welcome-response');
                         const welcomeElement = document.getElementById('welcome-message');
                         
-                        console.log('Welcome elements check:');
-                        console.log('- welcome-response exists:', !!welcomeResponse);
-                        console.log('- welcome-message exists:', !!welcomeElement);
-                        
-                        if (welcomeResponse) {
-                            console.log('- welcome-response display:', welcomeResponse.style.display);
-                            console.log('- welcome-response visibility:', window.getComputedStyle(welcomeResponse).visibility);
-                        }
                         
                         return welcomeResponse && welcomeElement;
                     }
 
                     // Load chat history when page loads
                     $(document).ready(function () {
-                        console.log('jQuery ready - loading chat history...');
                         
                         // Check welcome elements immediately
                         checkWelcomeElements();
@@ -460,7 +402,6 @@
                         setTimeout(function () {
                             const welcomeResponse = document.getElementById('welcome-response');
                             if (welcomeResponse && welcomeResponse.style.display === 'none') {
-                                console.log('Fallback: Welcome message not shown, generating now...');
                                 if (!welcomeMessageGenerated) {
                                     welcomeMessageGenerated = true;
                                     generateAIWelcomeMessage();
@@ -517,7 +458,6 @@
                                     page_type: debugPageType,
                                     page_url: debugPageUrl
                                 };
-                                console.log('Adding debug context to request:', requestData.debug_context);
                             }
                         }
 
@@ -530,7 +470,6 @@
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('Response:', data);
                                 $(".ai-loading").remove();
 
                                 // Handle new response format with metadata
@@ -576,37 +515,16 @@
                                 // Store chat session ID if this is a new chat
                                 if (data.chat_id && !chatSessionId) {
                                     chatSessionId = data.chat_id;
-                                    console.log('New chat session created with ID:', chatSessionId);
                                 }
 
                                 saveChatHistory(); // Save after AI response
                                 
                                 // Display action buttons if provided
-                                console.log('=== FRONTEND ACTION CHECK ===');
-                                console.log('Response data keys:', Object.keys(data));
-                                console.log('Actions field exists:', 'actions' in data);
-                                console.log('Actions value:', data.actions);
-                                
-                                // Check if action buttons container exists
-                                const actionButtons = document.getElementById('action-buttons');
-                                console.log('Action buttons container exists:', !!actionButtons);
-                                if (actionButtons) {
-                                    console.log('Action buttons container display:', actionButtons.style.display);
-                                }
-                                
-                                if (data.actions && data.actions.length > 0) {
-                                    console.log('Displaying action buttons:', data.actions);
-                                    // displayActionButtons(data.actions); // This function is no longer needed
-                                } else {
-                                    console.log('No actions to display');
-                                    // hideActionButtons(); // This function is no longer needed
-                                }
                                 
                                 scrollToBottom();
                                 document.getElementById('message').value = '';
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error:', error);
                                 $(".ai-loading").remove();
                                 $("#chat").append('<div class="ai-error">Error: ' + error + '</div>');
                                 saveChatHistory(); // Save after error
@@ -662,7 +580,6 @@
                                     page_type: debugPageType,
                                     page_url: debugPageUrl
                                 };
-                                console.log('Adding debug context to request:', requestData.debug_context);
                             }
                         }
 
@@ -675,7 +592,6 @@
                                 'X-CSRF-TOKEN': '<?= $token->generate('ai.settings') ?>'
                             },
                             success: function (data) {
-                                console.log('Response:', data);
                                 $(".ai-loading").remove();
 
                                 // Handle new response format with metadata
@@ -721,37 +637,16 @@
                                 // Store chat session ID if this is a new chat
                                 if (data.chat_id && !chatSessionId) {
                                     chatSessionId = data.chat_id;
-                                    console.log('New chat session created with ID:', chatSessionId);
                                 }
 
                                 saveChatHistory(); // Save after AI response
                                 
                                 // Display action buttons if provided
-                                console.log('=== FRONTEND ACTION CHECK ===');
-                                console.log('Response data keys:', Object.keys(data));
-                                console.log('Actions field exists:', 'actions' in data);
-                                console.log('Actions value:', data.actions);
-                                
-                                // Check if action buttons container exists
-                                const actionButtons = document.getElementById('action-buttons');
-                                console.log('Action buttons container exists:', !!actionButtons);
-                                if (actionButtons) {
-                                    console.log('Action buttons container display:', actionButtons.style.display);
-                                }
-                                
-                                if (data.actions && data.actions.length > 0) {
-                                    console.log('Displaying action buttons:', data.actions);
-                                    // displayActionButtons(data.actions); // This function is no longer needed
-                                } else {
-                                    console.log('No actions to display');
-                                    // hideActionButtons(); // This function is no longer needed
-                                }
                                 
                                 scrollToBottom(); // Scroll after adding AI response
                                 document.getElementById('message').value = '';
                             },
                             error: function (xhr, status, error) {
-                                console.error('Error:', error);
                                 $(".ai-loading").remove();
                                 $("#chat").append('<div class="ai-error">Error: ' + error + '</div>');
                                 saveChatHistory();
@@ -918,6 +813,162 @@
                         // Hide action buttons
                         hideActionButtons();
                         
+                        // First check if this is a form action
+                        fetch('<?php echo $controller->action('get_action_info'); ?>', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '<?php echo $token->generate('ai.settings'); ?>'
+                            },
+                            body: JSON.stringify({
+                                action_id: actionId
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(actionInfo => {
+                                if (actionInfo.actionType === 'form' || actionInfo.actionType === 'dynamic_form' || actionInfo.actionType === 'simple_form') {
+                                // Handle form action
+                                if (typeof startFormFromAction === 'function') {
+                                    startFormFromAction('<?php echo $uniqueID; ?>', actionId);
+                                } else {
+                                    // Fallback to regular action
+                                    executeRegularAction(actionId, actionName);
+                                }
+                            } else {
+                                // Handle regular action
+                                executeRegularAction(actionId, actionName);
+                            }
+                        })
+                        .catch(error => {
+                            // Fallback to regular action
+                            executeRegularAction(actionId, actionName);
+                        });
+                    }
+                    
+                    // Form handling functions integrated directly
+                    function startFormFromAction(chatbotId, actionId) {
+                        // Get the current chat session ID - use the global chatSessionId variable
+                        const chatId = chatSessionId;
+                        
+                        fetch('<?php echo $controller->action('start_form'); ?>', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '<?php echo $token->generate('ai.settings'); ?>'
+                            },
+                            body: JSON.stringify({
+                                action_id: actionId,
+                                chat_id: chatId
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.type === 'form_started') {
+                                // Store chat session ID if returned (new session)
+                                if (data.chat_id && !chatSessionId) {
+                                    chatSessionId = data.chat_id;
+                                }
+                                renderFormStep(data);
+                            } else if (data.error) {
+                                $("#chat").append('<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>Error starting form: ' + data.error + '</div></div>');
+                            } else {
+                                $("#chat").append('<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>Unexpected response from form system.</div></div>');
+                            }
+                        })
+                        .catch(error => {
+                            $("#chat").append('<div class="ai-response"><img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot"><div>Sorry, I encountered an error starting the form. Please try again.</div></div>');
+                        });
+                    }
+                    
+                    function renderFormStep(data) {
+                        
+                        const stepData = data.step_data;
+                        const progress = data.progress;
+                        
+                        let formHtml = '<div class="ai-response form-step-response">';
+                        formHtml += '<img src="https://d7keiwzj12p9.cloudfront.net/avatars/katalysis-bot-icon-1748356162310.webp" alt="Katalysis Bot">';
+                        formHtml += '<div class="message-content">';
+                        formHtml += '<div class="form-question">' + data.content + '</div>';
+                        
+                        // Render input based on field type
+                        if (stepData.field_type === 'select' && stepData.options) {
+                            formHtml += '<div class="form-options mt-3">';
+                            stepData.options.forEach(option => {
+                                formHtml += '<button type="button" class="btn btn-outline-primary me-2 mb-2" onclick="submitFormOption(\'' + stepData.field_key + '\', \'' + option + '\')">' + option + '</button>';
+                            });
+                            formHtml += '</div>';
+                        } else {
+                            formHtml += '<div class="form-input mt-3">';
+                            formHtml += '<input type="' + (stepData.field_type || 'text') + '" class="form-control" id="form-input-' + stepData.field_key + '" placeholder="Your answer..." onkeypress="handleFormKeypress(event, \'' + stepData.field_key + '\')">';
+                            formHtml += '<button type="button" class="btn btn-primary mt-2" onclick="submitFormInput(\'' + stepData.field_key + '\')">Submit</button>';
+                            formHtml += '</div>';
+                        }
+                        
+                        if (progress) {
+                            const percentage = Math.round((progress.current_step / progress.total_steps) * 100);
+                            formHtml += '<div class="form-progress mt-3">';
+                            formHtml += '<div class="progress"><div class="progress-bar" style="width: ' + percentage + '%"></div></div>';
+                            formHtml += '<small class="text-muted">Step ' + progress.current_step + ' of ' + progress.total_steps + '</small>';
+                            formHtml += '</div>';
+                        }
+                        
+                        formHtml += '</div></div>';
+                        
+                        $("#chat").append(formHtml);
+                        scrollToBottom();
+                        
+                        // Focus on the input if it's a text input
+                        if (stepData.field_type !== 'select') {
+                            setTimeout(() => {
+                                document.getElementById('form-input-' + stepData.field_key)?.focus();
+                            }, 100);
+                        }
+                    }
+                    
+                    function handleFormKeypress(event, fieldKey) {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            submitFormInput(fieldKey);
+                        }
+                    }
+                    
+                    function submitFormInput(fieldKey) {
+                        const input = document.getElementById('form-input-' + fieldKey);
+                        if (input && input.value.trim()) {
+                            submitFormValue(fieldKey, input.value.trim());
+                        }
+                    }
+                    
+                    function submitFormOption(fieldKey, option) {
+                        submitFormValue(fieldKey, option);
+                    }
+                    
+                    function submitFormValue(fieldKey, value) {
+                        
+                        // Disable the input/buttons to show it's submitted
+                        const input = document.getElementById('form-input-' + fieldKey);
+                        if (input) {
+                            input.disabled = true;
+                            input.value = value;
+                        }
+                        
+                        // Disable option buttons
+                        document.querySelectorAll('.form-options button').forEach(btn => {
+                            btn.disabled = true;
+                            if (btn.textContent === value) {
+                                btn.classList.remove('btn-outline-primary');
+                                btn.classList.add('btn-primary');
+                            }
+                        });
+                        
+                        // Show user response
+                        $("#chat").append('<div class="user-message">' + value + '</div>');
+                        
+                        // Send value as regular chat message (this will be handled by the enhanced ask_ai method)
+                        addMessageWithMode(value);
+                    }
+                    
+                    function executeRegularAction(actionId, actionName) {
                         // Get conversation context (last few messages)
                         const messages = document.querySelectorAll('#chat .ai-response, #chat .user-message');
                         const conversationContext = Array.from(messages)
@@ -948,7 +999,6 @@
                             scrollToBottom();
                         })
                         .catch(error => {
-                            console.error('Error:', error);
                             $("#chat").append('<div class="ai-error">Error executing action: ' + error.message + '</div>');
                             saveChatHistory();
                             scrollToBottom();
@@ -1163,21 +1213,16 @@
                         document.addEventListener('DOMContentLoaded', function() {
                             const forceActionsBtn = document.getElementById('testForceActionsBtn');
                             if (forceActionsBtn) {
-                                console.log('Force actions button found');
                                 forceActionsBtn.addEventListener('click', function() {
-                                    console.log('Force actions button clicked via event listener');
                                     testForceActions();
                                 });
                             } else {
-                                console.log('Force actions button not found');
                             }
                         });
                         
                         // Test force actions function
                         function testForceActions() {
-                            console.log('testForceActions function called');
                             const resultsDiv = document.getElementById('forceActionsResults');
-                            console.log('Results div:', resultsDiv);
                             resultsDiv.innerHTML = '<div class="alert alert-info">Testing force actions...</div>';
                             
                             fetch('<?php echo $controller->action('test_force_actions'); ?>', {
@@ -1214,7 +1259,6 @@
                         
                         // Test direct AI function
                         function testDirectAI() {
-                            console.log('testDirectAI function called');
                             const resultsDiv = document.getElementById('forceActionsResults');
                             resultsDiv.innerHTML = '<div class="alert alert-info">Testing direct AI...</div>';
                             

@@ -10,6 +10,20 @@ $blockID = $b->getBlockID();
 $uniqueID = 'chatbot-' . $blockID;
 ?>
 
+<?php
+$c = Page::getCurrentPage();
+if (is_object($c) && $c->isEditMode()) {
+    $loc = Localization::getInstance();
+    $loc->pushActiveContext(Localization::CONTEXT_UI);
+    ?>
+	<div class="ccm-edit-mode-disabled-item">
+		<div style="padding: 8px;"><?php echo t('Content disabled in edit mode.'); ?></div>
+	</div>
+    <?php
+    $loc->popActiveContext();
+} else { 
+?>
+
 <div id="<?php echo $uniqueID; ?>" class="katalysis-ai-chatbot-block" 
      data-position="<?php echo htmlspecialchars($chatbotPosition ?? 'bottom-right'); ?>"
      data-theme="<?php echo htmlspecialchars($theme ?? 'light'); ?>">
@@ -61,7 +75,19 @@ document.addEventListener('DOMContentLoaded', function() {
         pageTitle: <?php echo json_encode($pageTitle ?? ''); ?>,
         pageUrl: <?php echo json_encode($pageUrl ?? ''); ?>,
         pageType: <?php echo json_encode($pageType ?? ''); ?>,
-        welcomePrompt: <?php echo json_encode($welcomePrompt ?? ''); ?>
+        welcomePrompt: <?php echo json_encode($welcomePrompt ?? ''); ?>,
+        isEditMode: <?php echo json_encode($isEditMode ?? false); ?>,
+        colors: {
+            primary: <?php echo json_encode($primaryColor ?? '#7749F8'); ?>,
+            primaryDark: <?php echo json_encode($primaryDarkColor ?? '#4D2DA5'); ?>,
+            secondary: <?php echo json_encode($secondaryColor ?? '#6c757d'); ?>,
+            success: <?php echo json_encode($successColor ?? '#28a745'); ?>,
+            light: <?php echo json_encode($lightColor ?? '#ffffff'); ?>,
+            dark: <?php echo json_encode($darkColor ?? '#333333'); ?>,
+            border: <?php echo json_encode($borderColor ?? '#e9ecef'); ?>,
+            shadow: <?php echo json_encode($shadowColor ?? 'rgba(0,0,0,0.1)'); ?>,
+            hoverBg: <?php echo json_encode($hoverBgColor ?? 'rgba(255,255,255,0.2)'); ?>
+        }
     });
 });
 
@@ -69,6 +95,12 @@ function initializeChatbot(chatbotId, config) {
     // Store config globally
     window.chatbotConfigs = window.chatbotConfigs || {};
     window.chatbotConfigs[chatbotId] = config;
+    
+    // Initialize form handling for this chatbot
+    if (typeof initializeChatForms === 'function') {
+        initializeChatForms(chatbotId);
+    }
+    
     
     // Check if we have an existing chat session for this user across all pages
     let sessionId = localStorage.getItem('chatbot_global_session_id');
@@ -80,7 +112,6 @@ function initializeChatbot(chatbotId, config) {
     
     if (sessionId && sessionTimestamp && (now - parseInt(sessionTimestamp)) > sessionExpiry) {
         // Session expired, clear it and start fresh
-        console.log('Session expired, starting fresh');
         localStorage.removeItem('chatbot_global_session_id');
         localStorage.removeItem(`chatbot_chat_id_${sessionId}`);
         localStorage.removeItem(`chatbot_global_history_${sessionId}`);
@@ -102,7 +133,6 @@ function initializeChatbot(chatbotId, config) {
     window.chatbotConfigs[chatbotId].sessionId = sessionId;
     if (existingChatId) {
         window.chatbotConfigs[chatbotId].existingChatId = parseInt(existingChatId);
-        console.log('Restored existing chat ID:', existingChatId, 'for session:', sessionId);
     }
     
     // Add page unload listener to log conversation when user leaves
@@ -116,12 +146,9 @@ function initializeChatbot(chatbotId, config) {
     // Try to restore welcome message from separate storage
     const savedWelcomeMessage = localStorage.getItem(`chatbot_welcome_${chatbotId}`);
     if (savedWelcomeMessage) {
-        console.log('Found saved welcome message:', savedWelcomeMessage);
         const cleanHeaderText = cleanTextForHeader(savedWelcomeMessage);
-        console.log('Clean header text:', cleanHeaderText);
         updateAIHeaderGreeting(chatbotId, cleanHeaderText);
     } else {
-        console.log('No saved welcome message found, using default');
         // Set default header greeting until welcome message is generated
         updateAIHeaderGreeting(chatbotId, 'AI Assistant');
     }
@@ -302,38 +329,40 @@ function saveChatHistory(chatbotId) {
         // Save to localStorage
         localStorage.setItem(`chatbot_history_${chatbotId}`, JSON.stringify(chatHistory));
         
+        // Only log to database if there are actual conversation messages (not just welcome messages)
+        if (chatHistory.length === 0) {
+            return;
+        }
+        
+        // If there's a pending welcome message, let sendToAI handle the chat creation
+        if (window.pendingWelcomeMessage) {
+            return;
+        }
+        
         // Handle database logging based on whether this is a new session or existing one
         const config = window.chatbotConfigs[chatbotId];
         if (config) {
-            console.log('Current config state:', config);
-            console.log('Session ID:', config.sessionId);
-            console.log('Existing Chat ID:', config.existingChatId);
             
             // Check if we already have a chat record for this session
             const existingChatId = config.existingChatId;
             
             // Check if we're currently in the process of creating a chat record
             if (config.isCreatingChat) {
-                console.log('Chat creation in progress, skipping database logging');
                 return;
             }
             
             if (existingChatId) {
                 // Update existing chat record
-                console.log('Updating existing chat record with ID:', existingChatId);
                 updateChatInDatabase(chatbotId, chatHistory);
             } else {
                 // Create new chat record for this session
-                console.log('Creating new chat record for session:', config.sessionId);
                 config.isCreatingChat = true; // Set flag to prevent multiple calls
                 logChatToDatabase(chatbotId, chatHistory);
             }
         } else {
-            console.error('No config found for chatbot:', chatbotId);
         }
         
     } catch (error) {
-        console.error('Error saving chat history:', error);
     }
 }
 
@@ -370,11 +399,9 @@ function saveChatHistoryToLocalStorage(chatbotId) {
         if (config && config.sessionId) {
             const globalHistoryKey = `chatbot_global_history_${config.sessionId}`;
             localStorage.setItem(globalHistoryKey, JSON.stringify(chatHistory));
-            console.log('Saved chat history to global session:', config.sessionId);
         }
         
     } catch (error) {
-        console.error('Error saving chat history to localStorage:', error);
     }
 }
 
@@ -383,6 +410,13 @@ function saveChatHistoryToLocalStorage(chatbotId) {
  */
 function logCompleteConversationToDatabase(chatbotId) {
     try {
+        const config = window.chatbotConfigs[chatbotId];
+        
+        // Skip database logging when in edit mode
+        if (config && config.isEditMode) {
+            return;
+        }
+        
         const messagesContainer = document.getElementById(`${chatbotId}-messages`);
         const messages = messagesContainer.querySelectorAll('.chatbot-message:not(.typing-indicator)');
         
@@ -394,43 +428,37 @@ function logCompleteConversationToDatabase(chatbotId) {
         });
         
         if (chatHistory.length === 0) {
-            console.log('No messages to log to database');
             return;
         }
         
         // Only log to database if there are actual user messages (not just welcome messages)
         const hasUserMessages = chatHistory.some(msg => msg.sender === 'user');
         if (!hasUserMessages) {
-            console.log('No user messages found, skipping database logging to prevent welcome message records');
+            return;
+        }
+        
+        // If there's a pending welcome message, let sendToAI handle the chat creation
+        if (window.pendingWelcomeMessage) {
             return;
         }
         
         // Handle database logging based on whether this is a new session or existing one
-        const config = window.chatbotConfigs[chatbotId];
         if (config) {
-            console.log('Current config state:', config);
-            console.log('Session ID:', config.sessionId);
-            console.log('Existing Chat ID:', config.existingChatId);
             
             // Check if we already have a chat record for this session
             const existingChatId = config.existingChatId;
             
             if (existingChatId) {
                 // Update existing chat record
-                console.log('Updating existing chat record with ID:', existingChatId);
                 updateChatInDatabase(chatbotId, chatHistory);
             } else {
                 // Create new chat record for this session
-                console.log('Creating new chat record for session:', config.sessionId);
                 logChatToDatabase(chatbotId, chatHistory);
             }
         } else {
-            console.error('No config found for chatbot:', chatbotId);
         }
         
-        console.log('Complete conversation logged to database successfully');
     } catch (error) {
-        console.error('Error logging complete conversation to database:', error);
     }
 }
 
@@ -438,7 +466,6 @@ function loadChatHistory(chatbotId) {
     try {
         const config = window.chatbotConfigs[chatbotId];
         if (!config || !config.sessionId) {
-            console.log('No session ID available, cannot load chat history');
             return false;
         }
         
@@ -455,8 +482,6 @@ function loadChatHistory(chatbotId) {
             const chatHistory = JSON.parse(savedHistory);
             const messagesContainer = document.getElementById(`${chatbotId}-messages`);
             
-            console.log('Loading chat history:', chatHistory);
-            console.log('Number of messages:', chatHistory.length);
             
             // Filter out welcome messages - only show actual conversation messages
             const conversationMessages = chatHistory.filter(msg => {
@@ -469,9 +494,6 @@ function loadChatHistory(chatbotId) {
                 return !isWelcomeMessage;
             });
             
-            console.log('Filtered conversation messages:', conversationMessages.length);
-            console.log('User messages:', conversationMessages.filter(msg => msg.sender === 'user').length);
-            console.log('AI messages:', conversationMessages.filter(msg => msg.sender === 'ai').length);
             
             // Clear existing messages
             messagesContainer.innerHTML = '';
@@ -518,7 +540,6 @@ function loadChatHistory(chatbotId) {
                     scrollToBottom(chatbotId);
                 }, 10);
                 
-                console.log('Loaded conversation messages from global session:', config.sessionId);
                 
                 // Only show open chat interface if there are actual user messages
                 if (hasUserMessages) {
@@ -534,13 +555,17 @@ function loadChatHistory(chatbotId) {
         }
         return false; // Indicate that no history was loaded
     } catch (error) {
-        console.error('Error loading chat history:', error);
         return false; // Indicate that history loading failed
     }
 }
 
 function logChatToDatabase(chatbotId, chatHistory) {
     const config = window.chatbotConfigs[chatbotId];
+    
+    // Skip database logging when in edit mode
+    if (config && config.isEditMode) {
+        return;
+    }
     
     // Prepare chat data for database logging
     const chatData = {
@@ -564,7 +589,6 @@ function logChatToDatabase(chatbotId, chatHistory) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            console.log('Chat logged to database successfully');
             // Get chat ID directly from response
             if (data.chat_id) {
                 const chatId = parseInt(data.chat_id);
@@ -577,30 +601,16 @@ function logChatToDatabase(chatbotId, chatHistory) {
                 // Store chat ID in localStorage using session ID as key
                 if (config.sessionId) {
                     localStorage.setItem(`chatbot_chat_id_${config.sessionId}`, chatId.toString());
-                    console.log('Stored chat ID in localStorage:', chatId, 'for session:', config.sessionId);
                 }
                 
-                console.log('Stored chat ID:', chatId, 'for chatbot:', chatbotId);
-                console.log('Config after storing chat ID:', config);
-                
-                // Verify the chat ID is stored correctly
-                setTimeout(() => {
-                    const currentConfig = window.chatbotConfigs[chatbotId];
-                    console.log('Verification - Config after timeout:', currentConfig);
-                    console.log('Verification - existingChatId:', currentConfig.existingChatId);
-                    console.log('Verification - sessionId:', currentConfig.sessionId);
-                }, 100);
             } else {
-                console.warn('No chat_id in response:', data);
                 window.chatbotConfigs[chatbotId].isCreatingChat = false; // Clear the flag on error too
             }
         } else {
-            console.warn('Failed to log chat to database:', data.error);
             window.chatbotConfigs[chatbotId].isCreatingChat = false; // Clear the flag on error
         }
     })
     .catch(error => {
-        console.error('Error logging chat to database:', error);
         // Clear the flag on error
         if (window.chatbotConfigs[chatbotId]) {
             window.chatbotConfigs[chatbotId].isCreatingChat = false;
@@ -615,13 +625,14 @@ function updateChatInDatabase(chatbotId, chatHistory) {
     const config = window.chatbotConfigs[chatbotId];
     
     if (!config || !config.existingChatId) {
-        console.error('Cannot update chat: no existing chat ID found for chatbot:', chatbotId);
-        console.log('Config:', config);
         return;
     }
     
-    console.log('Updating chat in database with ID:', config.existingChatId);
-    console.log('Chat history length:', chatHistory.length);
+    // Skip database updates when in edit mode
+    if (config.isEditMode) {
+        return;
+    }
+    
     
     // Prepare chat data for updating
     const chatData = {
@@ -641,13 +652,10 @@ function updateChatInDatabase(chatbotId, chatHistory) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            console.log('Chat updated in database successfully');
         } else {
-            console.warn('Failed to update chat in database:', data.error);
         }
     })
     .catch(error => {
-        console.error('Error updating chat in database:', error);
     });
 }
 
@@ -696,6 +704,9 @@ function clearChatHistory(chatbotId) {
             // Clear any creation flags
             window.chatbotConfigs[chatbotId].isCreatingChat = false;
             
+            // Reset form state
+            window.chatbotConfigs[chatbotId].isFormActive = false;
+            
             // Reset header greeting to default temporarily
             updateAIHeaderGreeting(chatbotId, 'AI Assistant');
             
@@ -712,9 +723,7 @@ function clearChatHistory(chatbotId) {
             }
             // No fallback message needed - welcome message will be generated for header
             
-            console.log('Chat history cleared successfully, new session started');
         } catch (error) {
-            console.error('Error clearing chat history:', error);
         }
     }
 }
@@ -735,21 +744,46 @@ function sendToAI(chatbotId, message) {
     messagesContainer.appendChild(typingDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
     
+    // Prepare request data including form context if available
+    const requestData = {
+        message: message,
+        mode: 'rag',
+        page_type: config.pageType,
+        page_title: config.pageTitle,
+        page_url: config.pageUrl
+    };
+    
+    // Add session context for form processing
+    if (config.sessionId) {
+        requestData.session_id = config.sessionId;
+    }
+    if (config.existingChatId) {
+        requestData.chat_id = config.existingChatId;
+    }
+    
+    // Include pending welcome message if this is the first user message
+    if (window.pendingWelcomeMessage && !config.existingChatId) {
+        requestData.welcome_message = window.pendingWelcomeMessage;
+        requestData.new_chat = true;
+        // Clear the pending welcome message after including it
+        window.pendingWelcomeMessage = null;
+    }
+    
     fetch('/index.php/dashboard/katalysis_ai_chat_bot/chat_bot_settings/ask_ai/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
         },
-        body: JSON.stringify({
-            message: message,
-            mode: 'rag',
-            page_type: config.pageType,
-            page_title: config.pageTitle,
-            page_url: config.pageUrl
-        })
+        body: JSON.stringify(requestData)
     })
     .then(response => response.json())
     .then(data => {
+        // Debug logging to see what response we received
+        console.log('sendToAI - Response received:', data);
+        console.log('sendToAI - Response type:', data.type);
+        console.log('sendToAI - Response keys:', Object.keys(data));
+        
         // Remove typing indicator
         const messagesContainer = document.getElementById(`${chatbotId}-messages`);
         const typingIndicator = messagesContainer.querySelector('.typing-indicator');
@@ -760,6 +794,16 @@ function sendToAI(chatbotId, message) {
         // Hide messages container if no messages remain
         if (messagesContainer.children.length === 0) {
             messagesContainer.classList.remove('has-messages');
+        }
+        
+        // Store chat ID if this was a new chat creation
+        if (data.chat_id && !config.existingChatId) {
+            config.existingChatId = parseInt(data.chat_id);
+            
+            // Store chat ID in localStorage using session ID as key
+            if (config.sessionId) {
+                localStorage.setItem(`chatbot_chat_id_${config.sessionId}`, data.chat_id.toString());
+            }
         }
         
         if (data.error) {
@@ -774,7 +818,16 @@ function sendToAI(chatbotId, message) {
             }
             
             addChatMessage(chatbotId, errorMessage, 'ai');
+        } else if (data.type && (data.type.startsWith('form_') || data.type.startsWith('simple_form_'))) {
+            // Handle form responses (including simple_form_started)
+            console.log('sendToAI - Form response detected, calling handleFormResponseInBlock');
+            console.log('sendToAI - Form response type:', data.type);
+            handleFormResponseInBlock(chatbotId, data);
         } else {
+            console.log('sendToAI - Not a form response, processing as regular AI response');
+            console.log('sendToAI - Response type:', data.type);
+            console.log('sendToAI - startsWith form_:', data.type && data.type.startsWith('form_'));
+            console.log('sendToAI - startsWith simple_form_:', data.type && data.type.startsWith('simple_form_'));
             // Create the complete response content including buttons and links
             let responseContent = data.content;
             
@@ -824,17 +877,14 @@ function sendToAI(chatbotId, message) {
                 scrollToBottom(chatbotId);
             }, 50);
             
-            // Log the complete conversation to database after AI responds
+            // Log conversation to database after AI response
             setTimeout(() => {
                 logCompleteConversationToDatabase(chatbotId);
-            }, 500); // Increased delay to ensure existingChatId is set
+            }, 500);
             
-            // Debug: Log the response data to see what we're getting
-            console.log('AI Response Data:', data);
         }
     })
     .catch(error => {
-        console.error('AI request failed:', error);
         // Store fallback welcome message separately for header restoration
         localStorage.setItem(`chatbot_welcome_${chatbotId}`, 'Hello! How can I help you today?');
         // Only update header with fallback greeting, don't add to chat
@@ -847,18 +897,14 @@ function sendToAI(chatbotId, message) {
 }
 
 function generateWelcomeMessage(chatbotId, config) {
-    console.log('generateWelcomeMessage called for chatbot:', chatbotId);
-    console.log('Config:', config);
     
     if (!config.welcomePrompt) {
-        console.log('No welcome prompt, using fallback');
         // Store fallback welcome message separately for header restoration
         localStorage.setItem(`chatbot_welcome_${chatbotId}`, 'Hello! How can I help you today?');
         // Only update header with fallback greeting, don't add to chat
         updateAIHeaderGreeting(chatbotId, 'Hello! How can I help you today?');
         // Show welcome interface even with fallback message
         setTimeout(() => {
-            console.log('Showing welcome interface for fallback message');
             showWelcomeInterface(chatbotId);
         }, 50);
         return;
@@ -889,49 +935,44 @@ function generateWelcomeMessage(chatbotId, config) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
         },
         body: JSON.stringify({
             message: processedPrompt,
-            mode: 'basic'
+            mode: 'basic',
+            is_welcome_generation: true
         })
     })
     .then(response => response.json())
     .then(data => {
-        console.log('AI response data received:', data);
         if (data.error) {
-            console.log('AI error, using fallback greeting');
             // Store fallback welcome message separately for header restoration
             const fallbackMessage = 'Hello! How can I help you today?';
             localStorage.setItem(`chatbot_welcome_${chatbotId}`, fallbackMessage);
-            console.log('Stored fallback welcome message:', fallbackMessage);
             // Only update header with fallback greeting, don't add to chat
             updateAIHeaderGreeting(chatbotId, fallbackMessage);
             // Show welcome interface even with fallback message
             setTimeout(() => {
-                console.log('Showing welcome interface for fallback message');
                 showWelcomeInterface(chatbotId);
             }, 50);
         } else {
-            console.log('AI response received, updating header and storing welcome message');
-            console.log('AI response content:', data.content);
-            // Store welcome message separately for header restoration
+            // Store welcome message separately for header restoration and for later chat saving
             localStorage.setItem(`chatbot_welcome_${chatbotId}`, data.content);
-            console.log('Stored AI-generated welcome message:', data.content);
+            
+            // Store the welcome message for saving when user starts actual conversation
+            window.pendingWelcomeMessage = data.content;
             
             // Only update header with clean text, don't add to chat area
             const cleanHeaderText = cleanTextForHeader(data.content);
-            console.log('Clean header text from AI:', cleanHeaderText);
             updateAIHeaderGreeting(chatbotId, cleanHeaderText);
             
             // Show welcome interface after welcome message is generated
             setTimeout(() => {
-                console.log('Showing welcome interface for AI-generated message');
                 showWelcomeInterface(chatbotId);
             }, 50);
         }
     })
     .catch(error => {
-        console.error('AI request failed:', error);
         // Store fallback welcome message separately for header restoration
         localStorage.setItem(`chatbot_welcome_${chatbotId}`, 'Hello! How can I help you today?');
         // Only update header with fallback greeting, don't add to chat
@@ -945,11 +986,71 @@ function generateWelcomeMessage(chatbotId, config) {
 
 function executeAction(chatbotId, actionId) {
     const config = window.chatbotConfigs[chatbotId];
+    console.log('executeAction called:', chatbotId, actionId, config);
     
+    // First check if this is a form action by getting action info
+    fetch('/index.php/dashboard/katalysis_ai_chat_bot/chat_bot_settings/get_action_info/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
+        },
+        body: JSON.stringify({
+            action_id: actionId
+        })
+    })
+    .then(response => {
+        console.log('get_action_info response status:', response.status);
+        return response.json();
+    })
+    .then(actionInfo => {
+        console.log('Action info received:', actionInfo);
+        
+        // Check if this is a form action
+        if (actionInfo.actionType === 'form' || actionInfo.actionType === 'dynamic_form' || actionInfo.actionType === 'simple_form') {
+            console.log('Form action detected');
+            console.log('Show immediately setting:', actionInfo.showImmediately);
+            
+            // Check if this action should be shown immediately
+            if (actionInfo.showImmediately) {
+                console.log('Action has show immediately enabled, starting form...');
+                // Use the block's own form handling with proper CSRF tokens
+                startFormFromActionBlock(chatbotId, actionId);
+            } else {
+                console.log('Action does not have show immediately enabled, showing in More Information list');
+                // Show the action in the "More Information" list instead of starting the form
+                addChatMessage(chatbotId, `I can help you with that! Here's what you can do:`, 'ai');
+                
+                // Add a small delay to make the flow feel natural
+                setTimeout(() => {
+                    let actionsHtml = '<div class="more-info-links"><strong class="more-info-header">More Information:</strong>';
+                    actionsHtml += `<button class="action-button" onclick="executeAction('${chatbotId}', ${actionId})">`;
+                    actionsHtml += `<i class="${actionInfo.icon || 'fas fa-cog'}"></i> ${actionInfo.name || 'Action'}`;
+                    actionsHtml += '</button>';
+                    actionsHtml += '</div>';
+                    addChatMessage(chatbotId, actionsHtml, 'ai');
+                }, 500);
+            }
+        } else {
+            console.log('Regular action detected:', actionInfo.actionType);
+            // Handle regular action
+            executeRegularAction(chatbotId, actionId);
+        }
+    })
+    .catch(error => {
+        console.error('Error getting action info:', error);
+        addChatMessage(chatbotId, 'Error checking action type: ' + error.message, 'ai');
+        // Fallback to regular action execution
+        executeRegularAction(chatbotId, actionId);
+    });
+}
+
+function executeRegularAction(chatbotId, actionId) {
     fetch('/index.php/dashboard/katalysis_ai_chat_bot/chat_bot_settings/execute_action/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
         },
         body: JSON.stringify({
             action_id: actionId,
@@ -969,6 +1070,989 @@ function executeAction(chatbotId, actionId) {
     });
 }
 
+function startFormFromActionBlock(chatbotId, actionId) {
+    // Get the current chat session ID from the config
+    const config = window.chatbotConfigs[chatbotId];
+    const chatId = config?.existingChatId || null;
+    
+    console.log('startFormFromActionBlock called:', {
+        chatbotId,
+        actionId,
+        chatId,
+        config
+    });
+    
+    const requestData = {
+        action_id: actionId,
+        chat_id: chatId,
+        session_id: config.sessionId
+    };
+    
+    console.log('Sending start_form request:', requestData);
+    
+    fetch('/index.php/dashboard/katalysis_ai_chat_bot/chat_bot_settings/start_form/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => {
+        console.log('start_form response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('start_form response data:', data);
+        if (data.type === 'form_started' || data.type === 'simple_form_started') {
+            console.log('Form started successfully');
+            // Store chat session ID if returned (new session)
+            if (data.chat_id) {
+                config.existingChatId = data.chat_id;
+                console.log('Updated chat ID to:', data.chat_id);
+            }
+            
+            // Set form as active
+            config.isFormActive = true;
+            console.log('Form marked as active');
+            
+            // Route to appropriate renderer based on form type
+            if (data.type === 'simple_form_started') {
+                console.log('Using renderSimpleForm for simple_form_started');
+                renderSimpleForm(chatbotId, data);
+            } else {
+                console.log('Using renderSimpleFormStep for form_started');
+                renderSimpleFormStep(chatbotId, data);
+            }
+        } else if (data.error) {
+            console.error('Form start error from server:', data.error);
+            addChatMessage(chatbotId, `Error starting form: ${data.error}`, 'ai');
+        } else {
+            console.warn('Unexpected form start response:', data);
+            addChatMessage(chatbotId, 'Unexpected response from form system.', 'ai');
+        }
+    })
+    .catch(error => {
+        console.error('Error starting form (catch block):', error);
+        addChatMessage(chatbotId, `Form start failed: ${error.message}. Please check the browser console for details.`, 'ai');
+    });
+}
+
+function renderSimpleFormStep(chatbotId, data) {
+    const stepData = data.step_data;
+    const progress = data.progress;
+    
+    console.log('renderSimpleFormStep called with data:', data);
+    console.log('Step data:', stepData);
+    console.log('Progress:', progress);
+    
+    let formHtml = 'step info: <div class="simple-form-container" data-field-key="' + stepData.field_key + '">';
+    
+    // Progress indicator at the top
+    if (progress) {
+        const percentage = Math.round((progress.current_step / progress.total_steps) * 100);
+        formHtml = 'Step ' + progress.current_step + ' of ' + progress.total_steps + ': <div class="simple-form-container" data-field-key="' + stepData.field_key + '">';
+        formHtml += '<div class="form-progress mb-3">';
+        formHtml += '<div class="progress" style="height: 8px;"><div class="progress-bar progress-bar-striped" style="width: ' + percentage + '%"></div></div>';
+        formHtml += '</div>';
+    }
+    
+    formHtml += '<div class="form-label fw-semibold">' + data.content + '</div>';
+    formHtml += '<div class="form-group">';
+    
+    // Render input based on field type
+    if (stepData.field_type === 'select' && stepData.options) {
+        // Convert options to array if it's a string
+        let optionsArray = stepData.options;
+        if (typeof stepData.options === 'string') {
+            optionsArray = stepData.options.split('\n').filter(option => option.trim() !== '');
+        }
+        
+        if (Array.isArray(optionsArray) && optionsArray.length > 0) {
+            formHtml += '<div class="form-actions">';
+            optionsArray.forEach(option => {
+                formHtml += '<button type="button" class="action-button" ';
+                formHtml += 'onclick="submitFormOptionBlock(\'' + stepData.field_key + '\', \'' + option.trim() + '\', \'' + chatbotId + '\')">';
+                formHtml += '✓ ' + option.trim() + '</button>';
+            });
+            formHtml += '</div>';
+        } else {
+            // Fallback to text input if options are invalid
+            const inputType = stepData.field_type === 'textarea' ? 'textarea' : 'input';
+            const placeholder = stepData.placeholder || 'Type your answer here...';
+            
+            const inputTag = inputType === 'textarea' ? 
+                '<textarea class="form-control simple-form-input mb-2" id="form-input-' + stepData.field_key + '" name="' + stepData.field_key + '" placeholder="' + placeholder + '" rows="3"></textarea>' :
+                '<input type="' + (stepData.field_type || 'text') + '" class="form-control simple-form-input mb-2" id="form-input-' + stepData.field_key + '" name="' + stepData.field_key + '" placeholder="' + placeholder + '">';
+            
+            formHtml += inputTag;
+            formHtml += '<div class="form-actions">';
+            formHtml += '<button type="button" class="action-button" onclick="submitFormInputBlock(\'' + stepData.field_key + '\', \'' + chatbotId + '\')">';
+            formHtml += '<i class="fas fa-paper-plane"></i>Submit & Continue';
+            formHtml += '</button>';
+            
+            // Add skip button if the field is optional
+            if (stepData.validation && !stepData.validation.required) {
+                formHtml += '<button type="button" class="action-button-secondary" onclick="submitFormValueBlock(\'' + stepData.field_key + '\', \'\', \'' + chatbotId + '\')">';
+                formHtml += 'Skip';
+                formHtml += '</button>';
+            }
+            formHtml += '</div>';
+        }
+    } else {
+        const inputType = stepData.field_type === 'textarea' ? 'textarea' : 'input';
+        const placeholder = stepData.placeholder || 'Type your answer here...';
+                
+        const inputTag = inputType === 'textarea' ? 
+            '<textarea class="form-control simple-form-input mb-2" id="form-input-' + stepData.field_key + '" name="' + stepData.field_key + '" placeholder="' + placeholder + '" rows="3"></textarea>' :
+            '<input type="' + (stepData.field_type || 'text') + '" class="form-control simple-form-input mb-2" id="form-input-' + stepData.field_key + '" name="' + stepData.field_key + '" placeholder="' + placeholder + '">';
+        
+        formHtml += inputTag;
+        formHtml += '<div class="form-actions">';
+        formHtml += '<button type="button" class="action-button" onclick="submitFormInputBlock(\'' + stepData.field_key + '\', \'' + chatbotId + '\')">';
+        formHtml += '<i class="fas fa-paper-plane"></i>Submit & Continue';
+        formHtml += '</button>';
+        
+        // Add skip button if the field is optional
+        if (stepData.validation && !stepData.validation.required) {
+            formHtml += '<button type="button" class="action-button-secondary" onclick="submitFormValueBlock(\'' + stepData.field_key + '\', \'\', \'' + chatbotId + '\')">';
+            formHtml += 'Skip';
+            formHtml += '</button>';
+        }
+        formHtml += '</div>';
+    }
+    
+    formHtml += '</div>';
+    formHtml += '</div>';
+    
+    console.log('Form HTML generated:', formHtml);
+    
+    // Add the form step as an AI message
+    addChatMessage(chatbotId, formHtml, 'ai');
+    
+    // Focus on the input if it's a text input
+    if (stepData.field_type !== 'select') {
+        setTimeout(() => {
+            const input = document.getElementById('form-input-' + stepData.field_key);
+            console.log('Form input setup - Field key:', stepData.field_key);
+            console.log('Form input setup - Input element found:', input);
+            
+            if (input) {
+                console.log('Form input setup - Input element properties:', {
+                    tagName: input.tagName,
+                    type: input.type,
+                    id: input.id,
+                    name: input.name,
+                    value: input.value,
+                    placeholder: input.placeholder
+                });
+                
+                input.focus();
+                
+                // Add keyboard handlers
+                input.addEventListener('keypress', function(event) {
+                    console.log('Keypress event:', event.key, 'ctrlKey:', event.ctrlKey, 'tagName:', input.tagName.toLowerCase());
+                    
+                    // For regular inputs, Enter submits
+                    if (event.key === 'Enter' && input.tagName.toLowerCase() !== 'textarea') {
+                        console.log('Enter pressed on regular input, submitting form');
+                        event.preventDefault();
+                        submitFormInputBlock(stepData.field_key, chatbotId);
+                    }
+                    // For textareas, Ctrl+Enter submits
+                    if (event.key === 'Enter' && event.ctrlKey && input.tagName.toLowerCase() === 'textarea') {
+                        console.log('Ctrl+Enter pressed on textarea, submitting form');
+                        event.preventDefault();
+                        submitFormInputBlock(stepData.field_key, chatbotId);
+                    }
+                });
+                
+                // Add input event listener to track value changes
+                input.addEventListener('input', function(event) {
+                    console.log('Input event - Value changed to:', input.value);
+                });
+                
+                // Add change event listener
+                input.addEventListener('change', function(event) {
+                    console.log('Change event - Value changed to:', input.value);
+                });
+            } else {
+                console.error('Form input setup - Input element not found for field:', stepData.field_key);
+            }
+        }, 100);
+    }
+}
+
+function renderSimpleForm(chatbotId, data) {
+    console.log('renderSimpleForm called with data:', data);
+    console.log('Data type:', typeof data);
+    console.log('Data keys:', Object.keys(data));
+    console.log('Fields data:', data.fields);
+    console.log('Form steps data:', data.form_steps);
+    
+    const formFields = data.fields || data.form_steps || [];
+    const actionName = data.action_name || 'Form';
+    
+    console.log('Form fields to render:', formFields);
+    console.log('Action name:', actionName);
+    
+    if (!formFields || !Array.isArray(formFields) || formFields.length === 0) {
+        console.error('No form fields provided for simple form');
+        console.error('Form fields value:', formFields);
+        console.error('Form fields type:', typeof formFields);
+        console.error('Form fields is array:', Array.isArray(formFields));
+        addChatMessage(chatbotId, 'Error: No form fields defined', 'ai');
+        return;
+    }
+    
+    let formHtml = 'Please complete and submit:<div class="simple-form-container" data-action-id="' + data.action_id + '" data-chat-id="' + data.chat_id + '" data-form-id="' + Date.now() + '">';
+    formHtml += '<strong class="simple-form-header">' + actionName + '</strong>';
+    
+    // Render all fields
+    formFields.forEach((step, index) => {
+        const fieldKey = step.stepKey || step.field_key || 'field_' + index;
+        const fieldType = step.fieldType || step.field_type || 'text';
+        const label = step.question || step.label || 'Field ' + (index + 1);
+        const placeholder = step.placeholder || 'Enter ' + label.toLowerCase() + '...';
+        const required = step.validation?.required !== false;
+        
+        formHtml += '<div class="form-group mb-2">';
+        formHtml += '<label class="form-label fw-semibold">' + label;
+        if (required) formHtml += ' <span class="text-danger">*</span>';
+        formHtml += '</label>';
+        
+        if (fieldType === 'select' && step.options) {
+            // Convert options to array if it's a string
+            let optionsArray = step.options;
+            if (typeof step.options === 'string') {
+                optionsArray = step.options.split('\n').filter(option => option.trim() !== '');
+            }
+            
+            if (Array.isArray(optionsArray) && optionsArray.length > 0) {
+                // Render as buttons like Dynamic Form does
+                formHtml += '<div class="form-actions">';
+                optionsArray.forEach(option => {
+                    formHtml += '<button type="button" class="action-button" ';
+                    formHtml += 'onclick="selectSimpleFormOption(\'' + fieldKey + '\', \'' + option.trim() + '\', \'' + chatbotId + '\')">';
+                    formHtml += '✓ ' + option.trim() + '</button>';
+                });
+                formHtml += '</div>';
+                
+                // Add hidden input to store selected value
+                formHtml += '<input type="hidden" class="simple-form-input" id="simple-form-' + fieldKey + '" name="' + fieldKey + '" value=""' + (required ? ' required' : '') + '>';
+            } else {
+                // Fallback to text input if options are invalid
+                const inputType = fieldType === 'email' ? 'email' : fieldType === 'number' ? 'number' : 'text';
+                formHtml += '<input type="' + inputType + '" class="form-control simple-form-input" id="simple-form-' + fieldKey + '" name="' + fieldKey + '" placeholder="' + placeholder + '"' + (required ? ' required' : '') + '>';
+            }
+        } else if (fieldType === 'textarea') {
+            formHtml += '<textarea class="form-control simple-form-input" id="simple-form-' + fieldKey + '" name="' + fieldKey + '" placeholder="' + placeholder + '" rows="3"' + (required ? ' required' : '') + '></textarea>';
+        } else {
+            const inputType = fieldType === 'email' ? 'email' : fieldType === 'number' ? 'number' : 'text';
+            formHtml += '<input type="' + inputType + '" class="form-control simple-form-input" id="simple-form-' + fieldKey + '" name="' + fieldKey + '" placeholder="' + placeholder + '"' + (required ? ' required' : '') + '>';
+        }
+        
+        formHtml += '<div class="invalid-feedback" id="error-' + fieldKey + '"></div>';
+        formHtml += '</div>';
+    });
+    
+    // Submit button
+    formHtml += '<div class="form-actions">';
+    formHtml += '<button type="button" class="action-button" onclick="submitSimpleForm(\'' + chatbotId + '\')">';
+    formHtml += '<i class="fas fa-paper-plane"></i>Submit Form';
+    formHtml += '</button>';
+    formHtml += '</div>';
+    
+    formHtml += '</div>';
+    
+    // Add the form as an AI message
+    addChatMessage(chatbotId, formHtml, 'ai');
+    
+    // Focus on the first input
+    setTimeout(() => {
+        const firstInput = document.querySelector('.simple-form-container .simple-form-input');
+        if (firstInput) {
+            firstInput.focus();
+        }
+    }, 100);
+}
+
+function selectSimpleFormOption(fieldKey, option, chatbotId) {
+    // Find the hidden input for this field
+    const hiddenInput = document.getElementById('simple-form-' + fieldKey);
+    if (!hiddenInput) {
+        return;
+    }
+    
+    // Set the value
+    hiddenInput.value = option;
+    
+    // Find the form group containing this field
+    const formGroup = hiddenInput.closest('.form-group');
+    if (!formGroup) {
+        return;
+    }
+    
+    // Reset all buttons in this field group
+    const buttons = formGroup.querySelectorAll('.action-button');
+    buttons.forEach(btn => {
+        btn.classList.remove('selected');
+        btn.style.backgroundColor = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+    });
+    
+    // Find and mark the selected button
+    const selectedButton = Array.from(buttons).find(btn => {
+        return btn.textContent.trim() === '✓ ' + option;
+    });
+    
+    if (selectedButton) {
+        selectedButton.classList.add('selected');
+        selectedButton.style.backgroundColor = '#28a745';
+        selectedButton.style.borderColor = '#28a745';
+        selectedButton.style.color = 'white';
+    }
+}
+
+function submitSimpleForm(chatbotId) {
+    console.log('submitSimpleForm called for chatbot:', chatbotId);
+    
+    // Find the most recent simple-form-container (the one at the bottom of the chat)
+    const formContainers = document.querySelectorAll('.simple-form-container');
+    const formContainer = formContainers[formContainers.length - 1]; // Get the last one
+    
+    if (!formContainer) {
+        console.error('Simple form container not found');
+        return;
+    }
+    
+    // Additional check: ensure this is a simple form (has data-action-id and data-chat-id)
+    const actionId = formContainer.getAttribute('data-action-id');
+    const chatId = formContainer.getAttribute('data-chat-id');
+    
+    // Get config for session ID
+    const config = window.chatbotConfigs[chatbotId];
+    const formId = formContainer.getAttribute('data-form-id');
+    
+    console.log('Form container found:', {
+        actionId,
+        chatId,
+        formId,
+        totalContainers: formContainers.length,
+        containerIndex: formContainers.length - 1
+    });
+    
+    const inputs = formContainer.querySelectorAll('.simple-form-input');
+    
+    console.log('Form submission details:', { actionId, chatId, inputCount: inputs.length });
+    console.log('Form container attributes:', {
+        'data-action-id': formContainer.getAttribute('data-action-id'),
+        'data-chat-id': formContainer.getAttribute('data-chat-id'),
+        'data-form-id': formContainer.getAttribute('data-form-id'),
+        allAttributes: Array.from(formContainer.attributes).map(attr => attr.name + '=' + attr.value)
+    });
+    
+    if (!actionId || !chatId) {
+        console.error('Missing required IDs:', { actionId, chatId });
+        console.error('This might be a progressive form container (has data-field-key instead)');
+        alert('Error: Missing required form identifiers');
+        return;
+    }
+    
+    // Collect all field values
+    const formData = {};
+    let hasErrors = false;
+    
+    inputs.forEach(input => {
+        const fieldKey = input.name;
+        const value = input.value.trim();
+        const required = input.hasAttribute('required');
+        
+        // Clear previous errors
+        const errorDiv = document.getElementById('error-' + fieldKey);
+        if (errorDiv) {
+            errorDiv.textContent = '';
+        }
+        input.classList.remove('is-invalid');
+        
+        // Validate required fields
+        if (required && !value) {
+            hasErrors = true;
+            input.classList.add('is-invalid');
+            if (errorDiv) {
+                errorDiv.textContent = 'This field is required';
+            }
+        } else {
+            formData[fieldKey] = value;
+        }
+    });
+    
+    if (hasErrors) {
+        console.log('Form validation failed');
+        return;
+    }
+    
+    const payload = {
+        action_id: actionId,
+        chat_id: chatId,
+        form_data: formData
+    };
+    
+    // Disable submit button and show loading - target by onclick attribute to distinguish from option buttons
+    const submitBtn = formContainer.querySelector('button[onclick*="submitSimpleForm"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting...';
+    }
+    
+    // Submit to backend
+    fetch('/index.php/dashboard/katalysis_ai_chat_bot/chat_bot_settings/submit_simple_form/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
+        },
+        body: JSON.stringify({
+            action_id: actionId,
+            chat_id: chatId,
+            form_data: formData,
+            session_id: config.sessionId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Simple form submission response:', data);
+        
+        if (data.success) {
+            // First show what the user submitted with HTML formatting for frontend
+            let submissionSummary = 'Form submitted: <div class="form-submission-summary"><ul>';
+            for (const [key, value] of Object.entries(formData)) {
+                const displayKey = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
+                submissionSummary += `<li><strong>${displayKey}:</strong> ${value}</li>`;
+            }
+            submissionSummary += '</ul></div>';
+            addChatMessage(chatbotId, submissionSummary, 'user');
+            
+            // Then show the confirmation message
+            addChatMessage(chatbotId, data.message || 'Form submitted successfully!', 'ai');
+            
+            // Mark form as inactive
+            const config = window.chatbotConfigs[chatbotId];
+            if (config) {
+                config.isFormActive = false;
+            }
+            
+            // Hide the specific form that was submitted with a brief success message
+            const chatContainer = document.getElementById(`${chatbotId}-messages`);
+            if (chatContainer) {
+                const formContainers = chatContainer.querySelectorAll('.simple-form-container');
+                formContainers.forEach(form => {
+                    // Show a brief success message
+                    form.innerHTML = '<div class="alert alert-success text-center mb-0"><i class="fas fa-check-circle me-2"></i>Form submitted successfully!</div>';
+                    
+                    // Hide the form after a short delay
+                    setTimeout(() => {
+                        form.style.display = 'none';
+                    }, 2000);
+                });
+            }
+            
+        } else {
+            console.error('Form submission failed:', data.error);
+            addChatMessage(chatbotId, 'Error: ' + (data.error || 'Form submission failed'), 'ai');
+            
+            // Re-enable submit button
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit Form';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Form submission error:', error);
+        addChatMessage(chatbotId, 'Error submitting form: ' + error.message, 'ai');
+        
+        // Re-enable submit button
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Submit Form';
+        }
+    });
+}
+
+function submitFormInputBlock(fieldKey, chatbotId) {
+    console.log('submitFormInputBlock called:', fieldKey, chatbotId);
+    const input = document.getElementById('form-input-' + fieldKey);
+    console.log('Input element found:', input);
+    
+    if (input) {
+        // Check if already submitted to prevent double submission
+        if (input.disabled || input.classList.contains('submitted')) {
+            console.warn('Input already submitted, preventing double submission');
+            console.warn('Input disabled:', input.disabled);
+            console.warn('Input has submitted class:', input.classList.contains('submitted'));
+            console.warn('Input ID:', input.id);
+            console.warn('Input classes:', input.className);
+            
+            // Try to clear the state and allow submission
+            console.log('Attempting to clear input state and allow submission...');
+            input.disabled = false;
+            input.classList.remove('submitted');
+            console.log('Input state cleared, allowing submission');
+        }
+        
+        console.log('Input element properties:', {
+            tagName: input.tagName,
+            type: input.type,
+            id: input.id,
+            name: input.name,
+            value: input.value,
+            defaultValue: input.defaultValue,
+            innerHTML: input.innerHTML,
+            outerHTML: input.outerHTML.substring(0, 200) + '...'
+        });
+        
+        const value = input.value.trim();
+        console.log('Input value after trim:', value);
+        console.log('Input value length:', value.length);
+        
+        if (value) {
+            console.log('Calling submitFormValueBlock with value:', value);
+            submitFormValueBlock(fieldKey, value, chatbotId);
+        } else {
+            console.warn('Input value is empty, not submitting');
+            
+            // Try to get the value in different ways
+            console.log('Trying alternative ways to get input value:');
+            console.log('input.value:', input.value);
+            console.log('input.textContent:', input.textContent);
+            console.log('input.innerText:', input.innerText);
+            console.log('input.innerHTML:', input.innerHTML);
+            
+            // Check if this is a textarea
+            if (input.tagName.toLowerCase() === 'textarea') {
+                console.log('This is a textarea, checking textarea-specific properties');
+                console.log('textarea.value:', input.value);
+                console.log('textarea.textContent:', input.textContent);
+            }
+        }
+    } else {
+        console.error('Input element not found for field:', fieldKey);
+        
+        // Try to find the input element in different ways
+        console.log('Trying to find input element:');
+        console.log('By ID:', document.getElementById('form-input-' + fieldKey));
+        console.log('By name:', document.querySelector('input[name="' + fieldKey + '"]'));
+        console.log('By name (textarea):', document.querySelector('textarea[name="' + fieldKey + '"]'));
+        console.log('All form inputs:', document.querySelectorAll('input, textarea'));
+    }
+}
+
+function submitFormOptionBlock(fieldKey, option, chatbotId) {
+    submitFormValueBlock(fieldKey, option, chatbotId);
+}
+
+function submitFormValueBlock(fieldKey, value, chatbotId) {
+    console.log('submitFormValueBlock called:', fieldKey, value, chatbotId);
+    
+    // Check if already submitted to prevent double submission
+    const input = document.getElementById('form-input-' + fieldKey);
+    if (input && (input.disabled || input.classList.contains('submitted'))) {
+        console.warn('Form already submitted, preventing double submission');
+        return;
+    }
+    
+    // Disable the input/buttons to show it's submitted
+    if (input) {
+        input.disabled = true;
+        input.value = value;
+        input.classList.add('submitted');
+        console.log('Input disabled and marked as submitted');
+    }
+    
+    // Disable option buttons
+    document.querySelectorAll('[data-field-key="' + fieldKey + '"] .action-button').forEach(btn => {
+        btn.disabled = true;
+        if (btn.textContent.trim().replace('✓ ', '') === value) {
+            btn.classList.add('selected');
+        }
+    });
+    
+    // Disable submit button
+    document.querySelectorAll('[data-field-key="' + fieldKey + '"] button').forEach(btn => {
+        btn.disabled = true;
+    });
+    
+    // Show user response
+    console.log('Adding user message:', value);
+    addChatMessage(chatbotId, value, 'user');
+    
+    // Check if we're in an active form
+    const config = window.chatbotConfigs[chatbotId];
+    if (config && config.isFormActive) {
+        // Send form field response directly to backend
+        console.log('Sending form field response to backend:', value);
+        sendFormFieldResponse(chatbotId, fieldKey, value);
+    } else {
+        // Send value as regular chat message
+        console.log('Sending to AI as regular message:', value);
+        sendToAI(chatbotId, value);
+    }
+}
+
+/**
+ * Send form field response directly to backend for form processing
+ */
+function sendFormFieldResponse(chatbotId, fieldKey, value) {
+    const config = window.chatbotConfigs[chatbotId];
+    
+    // Show typing indicator
+    const messagesContainer = document.getElementById(`${chatbotId}-messages`);
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'chatbot-message chatbot-message-ai typing-indicator';
+    typingDiv.innerHTML = `
+        <div class="message-content">
+            <i class="fa fa-robot"></i>
+            <span>...</span>
+        </div>
+    `;
+    messagesContainer.appendChild(typingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Prepare request data for form field response
+    const requestData = {
+        message: value,
+        mode: 'rag',
+        page_type: config.pageType,
+        page_title: config.pageTitle,
+        page_url: config.pageUrl,
+        session_id: config.sessionId,
+        chat_id: config.existingChatId,
+        is_form_field: true,
+        field_key: fieldKey
+    };
+    
+    fetch('/index.php/dashboard/katalysis_ai_chat_bot/chat_bot_settings/ask_ai/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '<?php echo $csrfToken ?? ''; ?>'
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => {
+        // Remove typing indicator
+        const typingIndicator = messagesContainer.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            messagesContainer.removeChild(typingIndicator);
+        }
+        
+        // Check if response is ok
+        if (!response.ok) {
+            console.error('Form field response HTTP error:', response.status, response.statusText);
+            
+            // Try to get the error details
+            response.text().then(errorText => {
+                console.error('Form field response error text:', errorText);
+                
+                // Show error message to user
+                let errorMessage = `Server error (${response.status}): ${response.statusText}`;
+                if (errorText && !errorText.includes('<!DOCTYPE')) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        if (errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) {
+                        // If it's not JSON, show first 200 chars of error text
+                        if (errorText.length > 200) {
+                            errorMessage = errorText.substring(0, 200) + '...';
+                        } else {
+                            errorMessage = errorText;
+                        }
+                    }
+                }
+                
+                addChatMessage(chatbotId, `Error: ${errorMessage}`, 'ai');
+            }).catch(textError => {
+                console.error('Could not read error response text:', textError);
+                addChatMessage(chatbotId, `Server error (${response.status}): ${response.statusText}`, 'ai');
+            });
+            
+            return;
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        if (!data) {
+            return; // Error already handled above
+        }
+        
+        if (data.error) {
+            // Show error message
+            let errorMessage = 'Sorry, I encountered an error. Please try again.';
+            if (data.details) {
+                errorMessage = `Error: ${data.details}`;
+                if (data.type) {
+                    errorMessage += ` (${data.type})`;
+                }
+            }
+            addChatMessage(chatbotId, errorMessage, 'ai');
+        } else if (data.type && (data.type.startsWith('form_') || data.type.startsWith('simple_form_'))) {
+            // Handle form responses (including simple_form_started)
+            console.log('sendToAI - Form response detected, calling handleFormResponseInBlock');
+            console.log('sendToAI - Form response type:', data.type);
+            handleFormResponseInBlock(chatbotId, data);
+        } else {
+            console.log('sendToAI - Not a form response, processing as regular AI response');
+            console.log('sendToAI - Response type:', data.type);
+            console.log('sendToAI - startsWith form_:', data.type && data.type.startsWith('form_'));
+            console.log('sendToAI - startsWith simple_form_:', data.type && data.type.startsWith('simple_form_'));
+            // Handle regular AI responses
+            let responseContent = data.content;
+            responseContent = processAIResponseContent(responseContent);
+            
+            // Check if we have actions or links to add
+            const hasActions = data.actions && Array.isArray(data.actions) && data.actions.length > 0;
+            const hasLinks = (data.more_info_links && Array.isArray(data.more_info_links) && data.more_info_links.length > 0) || 
+                             (data.metadata && Array.isArray(data.metadata) && data.metadata.length > 0);
+            
+            if (hasActions || hasLinks) {
+                responseContent += '<div class="more-info-links">';
+                responseContent += '<strong class="more-info-header">More Information:</strong>';
+                
+                if (hasActions) {
+                    data.actions.forEach(action => {
+                        responseContent += `<button class="action-button" onclick="executeAction('${chatbotId}', ${action.id})">`;
+                        responseContent += `<i class="${action.icon || 'fas fa-cog'}"></i> ${action.name || 'Action'}`;
+                        responseContent += '</button>';
+                    });
+                }
+                
+                if (hasLinks) {
+                    const links = data.more_info_links || data.metadata;
+                    links.forEach(link => {
+                        if (link && link.url && link.title) {
+                            responseContent += `<a href="${link.url}" target="_blank" class="link-button">`;
+                            responseContent += '<i class="fas fa-link"></i> ' + link.title;
+                            responseContent += '</a>';
+                        }
+                    });
+                }
+                
+                responseContent += '</div>';
+            }
+            
+            addChatMessage(chatbotId, responseContent, 'ai');
+        }
+        
+        // Scroll to bottom
+        setTimeout(() => {
+            scrollToBottom(chatbotId);
+        }, 50);
+        
+        // Log conversation to database
+        setTimeout(() => {
+            logCompleteConversationToDatabase(chatbotId);
+        }, 500);
+    })
+    .catch(error => {
+        console.error('Form field response failed:', error);
+        
+        // Remove typing indicator
+        const typingIndicator = messagesContainer.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            messagesContainer.removeChild(typingIndicator);
+        }
+        
+        // Show more specific error message
+        let errorMessage = 'Sorry, I encountered an error processing your response. Please try again.';
+        
+        if (error.name === 'SyntaxError' && error.message.includes('Unexpected token')) {
+            errorMessage = 'The server returned an invalid response. This usually indicates a server error. Please try again or contact support.';
+        } else if (error.message) {
+            errorMessage = `Error: ${error.message}`;
+        }
+        
+        addChatMessage(chatbotId, errorMessage, 'ai');
+    });
+}
+
+/**
+ * Clear form state to prevent conflicts between different forms
+ */
+function clearFormState() {
+    console.log('Clearing form state...');
+    
+    // Remove any existing form containers from the DOM
+    const existingFormContainers = document.querySelectorAll('.simple-form-container');
+    existingFormContainers.forEach(container => {
+        console.log('Removing existing form container:', container);
+        container.remove();
+    });
+    
+    // Remove submitted class from all inputs (both simple-form-input and form-input-*)
+    const submittedInputs = document.querySelectorAll('.simple-form-input.submitted, input.submitted, textarea.submitted');
+    submittedInputs.forEach(input => {
+        input.classList.remove('submitted');
+        input.disabled = false;
+        console.log('Cleared submitted state for input:', input.id);
+    });
+    
+    // Also clear any inputs with form-input-* IDs that might be disabled
+    const formInputs = document.querySelectorAll('input[id^="form-input-"], textarea[id^="form-input-"]');
+    formInputs.forEach(input => {
+        if (input.disabled || input.classList.contains('submitted')) {
+            input.disabled = false;
+            input.classList.remove('submitted');
+            console.log('Cleared state for form input:', input.id);
+        }
+    });
+    
+    // Remove disabled state from all buttons
+    const disabledButtons = document.querySelectorAll('.action-button:disabled');
+    disabledButtons.forEach(button => {
+        button.disabled = false;
+        console.log('Cleared disabled state for button:', button.textContent.trim());
+    });
+    
+    // Remove selected class from option buttons
+    const selectedButtons = document.querySelectorAll('.action-button.selected');
+    selectedButtons.forEach(button => {
+        button.classList.remove('selected');
+        button.style.backgroundColor = '';
+        button.style.borderColor = '';
+        button.style.color = '';
+        console.log('Cleared selected state for button:', button.textContent.trim());
+    });
+    
+    console.log('Form state cleared successfully');
+}
+
+function handleFormResponseInBlock(chatbotId, data) {
+    const config = window.chatbotConfigs[chatbotId];
+    
+    switch (data.type) {
+        case 'form_started':
+            // Handle form start response
+            console.log('Form started response received:', data);
+            
+            // Clear any previous form state
+            clearFormState();
+            
+            // Store chat session ID if returned (new session)
+            if (data.chat_id && config) {
+                config.existingChatId = data.chat_id;
+                console.log('Updated chat ID to:', data.chat_id);
+            }
+            
+            // Set form as active
+            if (config) {
+                config.isFormActive = true;
+                console.log('Form marked as active - started');
+            }
+            
+            // Render the first form step
+            console.log('Rendering first form step');
+            renderSimpleFormStep(chatbotId, data);
+            break;
+            
+        case 'simple_form_started':
+            // Handle simple form start response (all fields at once)
+            console.log('Simple form started response received:', data);
+            console.log('Simple form data type:', typeof data);
+            console.log('Simple form data keys:', Object.keys(data));
+            console.log('Simple form fields:', data.fields);
+            
+            // Clear any previous form state
+            clearFormState();
+            
+            // Store chat session ID if returned (new session)
+            if (data.chat_id && config) {
+                config.existingChatId = data.chat_id;
+                console.log('Updated chat ID to:', data.chat_id);
+            }
+            
+            // Set form as active
+            if (config) {
+                config.isFormActive = true;
+                console.log('Simple form marked as active - started');
+            }
+            
+            // Render the simple form with all fields
+            console.log('About to call renderSimpleForm with data:', data);
+            renderSimpleForm(chatbotId, data);
+            console.log('renderSimpleForm called successfully');
+            break;
+            
+        case 'form_step':
+            // Always use enhanced renderSimpleFormStep for better debugging and UX
+            console.log('Using enhanced renderSimpleFormStep with debugging (handleFormResponseInBlock)');
+            renderSimpleFormStep(chatbotId, data);
+            break;
+            
+        case 'form_complete':
+            // Show completion message
+            addChatMessage(chatbotId, data.content || 'Form completed successfully!', 'ai');
+            
+            // Clear form state and reset
+            clearFormState();
+            if (config) {
+                config.isFormActive = false;
+                console.log('Form marked as inactive - completed');
+            }
+            
+            // Handle any follow-up actions
+            if (data.actions && data.actions.length > 0) {
+                setTimeout(() => {
+                    let actionsHtml = '<div class="more-info-links"><strong class="more-info-header">More Information:</strong>';
+                    data.actions.forEach(action => {
+                        actionsHtml += `<button class="action-button" onclick="executeAction('${chatbotId}', ${action.id})">`;
+                        actionsHtml += `<i class="${action.icon || 'fas fa-cog'}"></i> ${action.name || 'Action'}`;
+                        actionsHtml += '</button>';
+                    });
+                    actionsHtml += '</div>';
+                    addChatMessage(chatbotId, actionsHtml, 'ai');
+                }, 500);
+            }
+            break;
+            
+        case 'form_validation_error':
+            // Show validation error
+            const errorMessage = data.content || 'Please check your input and try again.';
+            addChatMessage(chatbotId, `<span style="color: #dc3545;">${errorMessage}</span>`, 'ai');
+            break;
+            
+        case 'form_cancelled':
+            // Show cancellation message
+            addChatMessage(chatbotId, data.content || 'Form cancelled. How else can I help you?', 'ai');
+            
+            // Clear form state and reset
+            clearFormState();
+            if (config) {
+                config.isFormActive = false;
+                console.log('Form marked as inactive - cancelled');
+            }
+            break;
+            
+        default:
+            console.warn('Unknown form response type:', data.type);
+            addChatMessage(chatbotId, data.content || 'Unexpected form response.', 'ai');
+            
+            // Reset form state on unknown response type
+            if (config) {
+                config.isFormActive = false;
+                console.log('Form marked as inactive - unknown response type');
+            }
+            break;
+    }
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -983,7 +2067,7 @@ function scrollToBottom(chatbotId) {
     }
 }
 
-// Function to clean text for header display (remove HTML tags and truncate)
+// Function to clean text for header display (remove HTML tags)
 function cleanTextForHeader(text) {
     if (!text || typeof text !== 'string') {
         return 'AI Assistant';
@@ -992,13 +2076,7 @@ function cleanTextForHeader(text) {
     // Remove HTML tags
     let cleanText = text.replace(/<[^>]*>/g, '');
     
-    // Get first sentence or first 100 characters
-    if (cleanText.includes('.')) {
-        cleanText = cleanText.split('.')[0] + '.';
-    } else if (cleanText.length > 100) {
-        cleanText = cleanText.substring(0, 100) + '...';
-    }
-    
+    // Return full text without truncation for welcome messages
     return cleanText.trim();
 }
 
@@ -1012,19 +2090,10 @@ function processAIResponseContent(content) {
 }
 
 function updateAIHeaderGreeting(chatbotId, greeting) {
-    console.log('updateAIHeaderGreeting called for chatbot:', chatbotId);
-    console.log('Greeting text:', greeting);
     
     const headerElement = document.querySelector(`#${chatbotId} .ai-header-greeting`);
     if (headerElement) {
-        console.log('Header element found:', headerElement);
-        console.log('Current header text:', headerElement.textContent);
         headerElement.textContent = greeting;
-        console.log('Header text updated to:', headerElement.textContent);
-    } else {
-        console.error('Header element not found for chatbot:', chatbotId);
-        console.log('Looking for selector: #${chatbotId} .ai-header-greeting');
-        console.log('Available elements with ai-header-greeting class:', document.querySelectorAll('.ai-header-greeting'));
     }
 }
 
@@ -1059,21 +2128,6 @@ function showWelcomeInterface(chatbotId) {
             messagesContainer.classList.remove('has-messages');
         }
         
-        console.log('Welcome interface shown for chatbot:', chatbotId);
-        console.log('Interface display:', interface.style.display);
-        console.log('Toggle display:', toggle.style.display);
-        
-        // Check if input field is visible
-        const inputField = document.getElementById(`${chatbotId}-input`);
-        if (inputField) {
-            console.log('Input field found:', inputField);
-            console.log('Input field display:', inputField.style.display);
-            console.log('Input field computed display:', window.getComputedStyle(inputField).display);
-        } else {
-            console.log('Input field not found');
-        }
-    } else {
-        console.error('Interface or toggle not found for chatbot:', chatbotId);
     }
 }
 
@@ -1153,15 +2207,15 @@ function handleChatButtonClick(chatbotId) {
 
 <style>
 :root {
-    --chatbot-primary: #7749F8;
-    --chatbot-primary-dark: #4D2DA5;
-    --chatbot-secondary: #6c757d;
-    --chatbot-success: #28a745;
-    --chatbot-light: white;
-    --chatbot-dark: #333;
-    --chatbot-border: #e9ecef;
-    --chatbot-shadow: rgba(0,0,0,0.1);
-    --chatbot-hover-bg: rgba(255,255,255,0.2);
+    --chatbot-primary: <?php echo $primaryColor ?? '#7749F8'; ?>;
+    --chatbot-primary-dark: <?php echo $primaryDarkColor ?? '#4D2DA5'; ?>;
+    --chatbot-secondary: <?php echo $secondaryColor ?? '#6c757d'; ?>;
+    --chatbot-success: <?php echo $successColor ?? '#28a745'; ?>;
+    --chatbot-light: <?php echo $lightColor ?? '#ffffff'; ?>;
+    --chatbot-dark: <?php echo $darkColor ?? '#333333'; ?>;
+    --chatbot-border: <?php echo $borderColor ?? '#e9ecef'; ?>;
+    --chatbot-shadow: <?php echo $shadowColor ?? 'rgba(0,0,0,0.1)'; ?>;
+    --chatbot-hover-bg: <?php echo $hoverBgColor ?? 'rgba(255,255,255,0.2)'; ?>;
 }
 
 
@@ -1235,11 +2289,14 @@ function handleChatButtonClick(chatbotId) {
 }
 
 /* More Information header styling */
-.more-info-header {
+.more-info-header, .simple-form-header {
     display: block;
     font-size: 0.7.5rem;
     color: var(--chatbot-secondary);
     font-weight: 600;
+}
+.simple-form-header {
+    margin:10px 0;
 }
 
 .chatbot-clear {
@@ -1287,6 +2344,12 @@ function handleChatButtonClick(chatbotId) {
 }
 
 .chatbot-messages {
+    /* Fallback for older browsers */
+    background: linear-gradient(180deg, 
+        rgba(26, 188, 156, 0.1), 
+        rgba(26, 188, 156, 0.4)
+    );
+    /* Modern browsers with color-mix support */
     background: linear-gradient(180deg,
         color-mix(in srgb, var(--chatbot-primary) 10%, white),
         color-mix(in srgb, var(--chatbot-primary) 40%, white)
@@ -1381,7 +2444,7 @@ function handleChatButtonClick(chatbotId) {
 }
 
 .chatbot-input-field::placeholder {
-    color: #6c757d;
+    color: black;
 }
 
 .chatbot-send-btn {
@@ -1437,6 +2500,10 @@ function handleChatButtonClick(chatbotId) {
     color: white;
 }
 
+.action-button i {
+    margin-right:6px;
+}
+
 .action-button:hover {
     background-color: var(--chatbot-primary-dark);
     border-color: var(--chatbot-primary-dark);
@@ -1468,6 +2535,50 @@ a.link-button:hover {
     text-decoration: underline;
 }
 
+/* Form styles */
+
+.form-step-question {
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+
+.simple-form-container .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.form-progress {
+    margin-top: 10px;
+}
+
+.form-progress .progress {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #e9ecef;
+}
+
+.form-progress .progress-bar {
+    background-color: var(--chatbot-primary);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.form-step-actions {
+    margin-top: 10px;
+    text-align: right;
+}
+
+.form-field-error {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
 .chatbot-title {
     text-align: center;
     margin-bottom: 15px;
@@ -1495,6 +2606,14 @@ a.link-button:hover {
     border-top-color: #4a5568;
 }
 
+.form-submission-summary {
+    margin-top: 10px;
+}
+
+.form-submission-summary li {
+    margin-bottom: 5px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .chatbot-interface {
@@ -1514,4 +2633,101 @@ a.link-button:hover {
         width: 100%;
     }
 }
+
+/* Simple Form Styles */
+.simple-form-container {
+    position: relative;
+    padding-top:10px;
+}
+
+.simple-form-container .form-header {
+    margin-bottom: 20px;
+}
+
+.simple-form-container .form-header h5 {
+    color: var(--chatbot-primary);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.simple-form-container .form-group {
+    margin-bottom: 20px;
+}
+
+.simple-form-container .form-group:last-child {
+    margin-bottom: 0;
+}
+
+
+.simple-form-container .form-label {
+    color: #2c3e50;
+    font-weight: 600;
+    font-size:12px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.simple-form-container .simple-form-input {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 10px 8px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.simple-form-container .simple-form-input:focus {
+    border-color: var(--chatbot-primary);
+    box-shadow: 0 0 0 3px rgba(119, 73, 248, 0.1);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.simple-form-container .simple-form-input.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.simple-form-container .invalid-feedback {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+}
+
+.simple-form-container .form-actions {
+    text-align: center;
+}
+
+.simple-form-container .action-button {
+    width: 100%;
+}
+
+.simple-form-container .action-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+}
+
+.simple-form-container .action-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.simple-form-container .text-danger {
+    color: #dc3545 !important;
+}
+
+@media (max-width: 768px) {
+    .simple-form-container {
+        padding: 15px;
+        margin: 5px 0;
+    }
+    
+    .simple-form-container .btn-primary {
+        padding: 12px 30px;
+        font-size: 14px;
+    }
+}
 </style> 
+
+<?php } ?>

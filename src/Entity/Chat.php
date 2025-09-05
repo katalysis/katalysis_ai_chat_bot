@@ -155,6 +155,24 @@ class Chat
      * @ORM\Column(name="`userMessageCount`", type="integer", nullable=true)
      */
     protected $userMessageCount = 0;
+
+    /**
+     * @var string
+     * @ORM\Column(name="`submittedInfo`", type="text", nullable=true)
+     */
+    protected $submittedInfo = '';
+
+    /**
+     * @var string
+     * @ORM\Column(name="`activeFormState`", type="text", nullable=true)
+     */
+    protected $activeFormState = '';
+
+    /**
+     * @var string
+     * @ORM\Column(name="`welcomeMessage`", type="text", nullable=true)
+     */
+    protected $welcomeMessage = null;
     
     
     /**
@@ -339,6 +357,30 @@ class Chat
     public function getPhone()
     {
         return $this->Phone;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSubmittedInfo()
+    {
+        return $this->submittedInfo;
+    }
+
+    /**
+     * @return string
+     */
+    public function getActiveFormState()
+    {
+        return $this->activeFormState;
+    }
+
+    /**
+     * @return string
+     */
+    public function getWelcomeMessage()
+    {
+        return $this->welcomeMessage;
     }
 
     
@@ -569,6 +611,36 @@ class Chat
     public function setPhone($Phone)
     {
         $this->Phone = $Phone;
+         return $this;
+    }
+
+    /**
+     * @param string $submittedInfo
+     * @return Chat
+     */
+    public function setSubmittedInfo($submittedInfo)
+    {
+        $this->submittedInfo = $submittedInfo;
+         return $this;
+    }
+
+    /**
+     * @param string $activeFormState
+     * @return Chat
+     */
+    public function setActiveFormState($activeFormState)
+    {
+        $this->activeFormState = $activeFormState;
+         return $this;
+    }
+
+    /**
+     * @param string $welcomeMessage
+     * @return Chat
+     */
+    public function setWelcomeMessage($welcomeMessage)
+    {
+        $this->welcomeMessage = $welcomeMessage;
          return $this;
     }
 

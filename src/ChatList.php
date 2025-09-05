@@ -22,7 +22,7 @@ use Closure;
 class ChatList extends ItemList implements PagerProviderInterface, PaginationProviderInterface
 {
     protected $isFulltextSearch = false;
-    protected $autoSortColumns = ['c.id', 'c.started', 'c.location', 'c.llm', 'c.Name', 'c.Email', 'c.Phone', 'c.launchPageTitle', 'c.createdDate', 'c.utmSource', 'c.launchPageUrl', 'c.launchPageType', 'c.firstMessage', 'c.lastMessage', 'c.utmId', 'c.utmMedium', 'c.utmCampaign', 'c.utmTerm', 'c.utmContent'];
+    protected $autoSortColumns = ['c.id', 'c.started', 'c.location', 'c.llm', 'c.Name', 'c.Email', 'c.Phone', 'c.launchPageTitle', 'c.createdDate', 'c.utmSource', 'c.launchPageUrl', 'c.launchPageType', 'c.firstMessage', 'c.lastMessage', 'c.utmId', 'c.utmMedium', 'c.utmCampaign', 'c.utmTerm', 'c.utmContent', 'c.welcomeMessage'];
     protected $permissionsChecker = -1;
     
     public function createQuery()
@@ -41,7 +41,7 @@ class ChatList extends ItemList implements PagerProviderInterface, PaginationPro
      */
     public function filterByKeywords($keywords)
     {
-        $this->query->andWhere('(c.`id` LIKE :keywords OR c.`started` LIKE :keywords OR c.`location` LIKE :keywords OR c.`llm` LIKE :keywords OR c.`Name` LIKE :keywords OR c.`Email` LIKE :keywords OR c.`Phone` LIKE :keywords OR c.`launchPageTitle` LIKE :keywords OR c.`createdDate` LIKE :keywords OR c.`utmSource` LIKE :keywords OR c.`launchPageUrl` LIKE :keywords OR c.`launchPageType` LIKE :keywords OR c.`firstMessage` LIKE :keywords OR c.`lastMessage` LIKE :keywords OR c.`utmId` LIKE :keywords OR c.`utmMedium` LIKE :keywords OR c.`utmCampaign` LIKE :keywords OR c.`utmTerm` LIKE :keywords OR c.`utmContent` LIKE :keywords)');
+        $this->query->andWhere('(c.`id` LIKE :keywords OR c.`started` LIKE :keywords OR c.`location` LIKE :keywords OR c.`llm` LIKE :keywords OR c.`Name` LIKE :keywords OR c.`Email` LIKE :keywords OR c.`Phone` LIKE :keywords OR c.`launchPageTitle` LIKE :keywords OR c.`createdDate` LIKE :keywords OR c.`utmSource` LIKE :keywords OR c.`launchPageUrl` LIKE :keywords OR c.`launchPageType` LIKE :keywords OR c.`firstMessage` LIKE :keywords OR c.`lastMessage` LIKE :keywords OR c.`utmId` LIKE :keywords OR c.`utmMedium` LIKE :keywords OR c.`utmCampaign` LIKE :keywords OR c.`utmTerm` LIKE :keywords OR c.`utmContent` LIKE :keywords OR c.`welcomeMessage` LIKE :keywords)');
         $this->query->setParameter('keywords', '%' . $keywords . '%');
     }
     
