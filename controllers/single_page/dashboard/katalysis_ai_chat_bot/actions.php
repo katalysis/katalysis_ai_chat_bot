@@ -401,4 +401,47 @@ class Actions extends DashboardPageController
             }
         }
     }
+    
+    public function save_form_steps()
+    {
+        if (!$this->token->validate('save_form_steps')) {
+            return new Response('Invalid token', 403);
+        }
+        
+        $actionId = $this->request->request->get('action_id');
+        $formSteps = $this->request->request->get('form_steps');
+        
+        if (!$actionId || !$formSteps) {
+            return new Response('Missing parameters', 400);
+        }
+        
+        try {
+            /** @var ActionEntity $action */
+            $action = $this->entityManager->getRepository(ActionEntity::class)->findOneBy([
+                "id" => $actionId
+            ]);
+            
+            if (!$action) {
+                return new Response('Action not found', 404);
+            }
+            
+            // Validate JSON
+            $decoded = json_decode($formSteps, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return new Response('Invalid JSON', 400);
+            }
+            
+            // Update the form steps
+            $action->setFormSteps($formSteps);
+            
+            $this->entityManager->persist($action);
+            $this->entityManager->flush();
+            
+            return new Response('Form steps saved successfully', 200);
+            
+        } catch (\Exception $e) {
+            error_log('Error saving form steps: ' . $e->getMessage());
+            return new Response('Error saving form steps: ' . $e->getMessage(), 500);
+        }
+    }
 } 
