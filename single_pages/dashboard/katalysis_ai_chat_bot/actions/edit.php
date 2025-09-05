@@ -303,6 +303,97 @@ $createdByName = isset($createdByName) ? $createdByName : '';
 </form>
 
 <script>
+    // Track unsaved changes
+    window.hasUnsavedChanges = false;
+    
+    // Function to mark changes as unsaved
+    function markUnsavedChanges() {
+        window.hasUnsavedChanges = true;
+        updateSaveButtonState();
+        
+        // Auto-save form steps to database after a short delay
+        clearTimeout(window.autoSaveTimeout);
+        window.autoSaveTimeout = setTimeout(function() {
+            autoSaveFormSteps();
+        }, 2000); // 2 second delay
+    }
+    
+    // Function to mark changes as saved
+    function markChangesSaved() {
+        window.hasUnsavedChanges = false;
+        updateSaveButtonState();
+    }
+    
+    // Update save button state and text
+    function updateSaveButtonState() {
+        const saveButton = $('button[type="submit"]').first();
+        if (window.hasUnsavedChanges) {
+            saveButton.removeClass('btn-secondary').addClass('btn-warning');
+            saveButton.html('<i class="fas fa-save"></i> Save Changes*');
+        } else {
+            saveButton.removeClass('btn-warning').addClass('btn-secondary');
+            saveButton.html('<i class="fas fa-save"></i> Save');
+        }
+    }
+    
+    // Auto-save form steps to database
+    function autoSaveFormSteps() {
+        const actionId = $('input[name="actionId"]').val();
+        const formStepsJson = $('textarea[name="formSteps"]').val();
+        
+        if (!actionId || !formStepsJson) {
+            return;
+        }
+        
+        // Show auto-save indicator
+        showAutoSaveIndicator('Saving...');
+        
+        $.ajax({
+            url: '<?php echo $this->action("save_form_steps"); ?>',
+            method: 'POST',
+            data: {
+                action_id: actionId,
+                form_steps: formStepsJson,
+                ccm_token: '<?php echo $token->generate("save_form_steps"); ?>'
+            },
+            success: function(response) {
+                showAutoSaveIndicator('Auto-saved', 'success');
+                // Keep the main form unsaved changes indicator for other fields
+                updateSaveButtonState();
+            },
+            error: function() {
+                showAutoSaveIndicator('Save failed', 'error');
+            }
+        });
+    }
+    
+    // Show auto-save status indicator
+    function showAutoSaveIndicator(message, type = 'info') {
+        // Remove existing indicator
+        $('.auto-save-indicator').remove();
+        
+        let className = 'text-muted';
+        let icon = 'fas fa-spinner fa-spin';
+        
+        if (type === 'success') {
+            className = 'text-success';
+            icon = 'fas fa-check';
+        } else if (type === 'error') {
+            className = 'text-danger';
+            icon = 'fas fa-exclamation-triangle';
+        }
+        
+        const indicator = $(`<small class="auto-save-indicator ${className} ms-2"><i class="${icon}"></i> ${message}</small>`);
+        $('legend:contains("Form Builder")').append(indicator);
+        
+        // Auto-hide success/error messages after 3 seconds
+        if (type === 'success' || type === 'error') {
+            setTimeout(() => {
+                indicator.fadeOut();
+            }, 3000);
+        }
+    }
+    
     $(document).ready(function () {
         // Show/hide form builder based on action type
         function toggleFormBuilder() {
@@ -377,10 +468,10 @@ $createdByName = isset($createdByName) ? $createdByName : '';
                 const fieldType = step.fieldType || 'text';
                 const question = step.question || '(No question set)';
                 const stepHtml = `
-                <div class="card mb-3" data-step-index="${index}">
+                <div class="card mb-3 form-step-card" data-step-index="${index}" draggable="true">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">
-                            <i class="fas fa-grip-vertical me-2"></i>
+                            <i class="fas fa-grip-vertical me-2 drag-handle" style="cursor: move;" title="Drag to reorder"></i>
                             Step ${index + 1}: ${fieldType.toUpperCase()} - ${stepKey}
                         </h6>
                         <div>
@@ -402,12 +493,149 @@ $createdByName = isset($createdByName) ? $createdByName : '';
                             </div>
                         </div>
                         ${step.options ? `<div class="mt-2"><strong>Options:</strong> ${step.options.join(', ')}</div>` : ''}
-                        ${step.conditionalLogic ? `<div class="mt-2"><strong>Conditional Logic:</strong> ${JSON.stringify(step.conditionalLogic)}</div>` : ''}
+                        ${step.conditionalLogic ? `
+                            <div class="mt-2">
+                                <strong><i class="fas fa-robot me-1"></i>AI Logic:</strong>
+                                <div class="badge bg-info">AI Controlled</div>
+                                <div class="mt-1"><small class="text-muted">${step.conditionalLogic.decision_prompt}</small></div>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
                 container.append(stepHtml);
             });
+            
+            // Initialize drag and drop functionality
+            initializeDragAndDrop();
+        }
+
+        // Initialize drag and drop functionality for form steps
+        function initializeDragAndDrop() {
+            let draggedElement = null;
+            let draggedIndex = null;
+            
+            // Add event listeners to all form step cards
+            $('.form-step-card').each(function() {
+                const card = this;
+                
+                card.addEventListener('dragstart', function(e) {
+                    draggedElement = this;
+                    draggedIndex = parseInt($(this).data('step-index'));
+                    $(this).addClass('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', this.outerHTML);
+                });
+                
+                card.addEventListener('dragend', function(e) {
+                    $(this).removeClass('dragging');
+                    $('.drag-over').removeClass('drag-over');
+                    draggedElement = null;
+                    draggedIndex = null;
+                });
+                
+                card.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    
+                    const afterElement = getDragAfterElement(container, e.clientY);
+                    const dragging = document.querySelector('.dragging');
+                    
+                    if (afterElement == null) {
+                        container.appendChild(dragging);
+                    } else {
+                        container.insertBefore(dragging, afterElement);
+                    }
+                });
+                
+                card.addEventListener('dragenter', function(e) {
+                    e.preventDefault();
+                    $(this).addClass('drag-over');
+                });
+                
+                card.addEventListener('dragleave', function(e) {
+                    $(this).removeClass('drag-over');
+                });
+                
+                card.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    
+                    if (draggedElement !== this) {
+                        const dropIndex = parseInt($(this).data('step-index'));
+                        reorderFormSteps(draggedIndex, dropIndex);
+                    }
+                    
+                    $('.drag-over').removeClass('drag-over');
+                });
+            });
+            
+            const container = document.getElementById('form-steps-container');
+            
+            container.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(container, e.clientY);
+                const dragging = document.querySelector('.dragging');
+                
+                if (dragging) {
+                    if (afterElement == null) {
+                        container.appendChild(dragging);
+                    } else {
+                        container.insertBefore(dragging, afterElement);
+                    }
+                }
+            });
+            
+            container.addEventListener('drop', function(e) {
+                e.preventDefault();
+                
+                // Get the final position and reorder
+                const dragging = document.querySelector('.dragging');
+                if (dragging && draggedIndex !== null) {
+                    const cards = Array.from(container.querySelectorAll('.form-step-card'));
+                    const newIndex = cards.indexOf(dragging);
+                    
+                    if (newIndex !== draggedIndex && newIndex !== -1) {
+                        reorderFormSteps(draggedIndex, newIndex);
+                    }
+                }
+            });
+        }
+        
+        // Helper function to determine where to insert the dragged element
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.form-step-card:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+        
+        // Reorder form steps in the array
+        function reorderFormSteps(fromIndex, toIndex) {
+            if (fromIndex === toIndex || !window.formSteps) return;
+            
+            // Move the element in the array
+            const movedStep = window.formSteps.splice(fromIndex, 1)[0];
+            window.formSteps.splice(toIndex, 0, movedStep);
+            
+            // Update sort orders
+            window.formSteps.forEach((step, idx) => {
+                step.sortOrder = idx + 1;
+            });
+            
+            // Update JSON and re-render
+            saveFormStepsToJson();
+            renderFormSteps();
+            
+            // Mark as having unsaved changes
+            markUnsavedChanges();
         }
 
         // Add new form step
@@ -427,6 +655,7 @@ $createdByName = isset($createdByName) ? $createdByName : '';
             window.formSteps.push(newStep);
             saveFormStepsToJson();
             renderFormSteps();
+            markUnsavedChanges();
         };
 
         // Remove form step
@@ -439,6 +668,7 @@ $createdByName = isset($createdByName) ? $createdByName : '';
                 });
                 saveFormStepsToJson();
                 renderFormSteps();
+                markUnsavedChanges();
             }
         };
 
@@ -522,7 +752,21 @@ $createdByName = isset($createdByName) ? $createdByName : '';
                     <textarea class="form-control" id="edit-options-${index}" rows="3" placeholder="Option 1&#10;Option 2&#10;Option 3">${step.options ? step.options.join('\n') : ''}</textarea>
                     <small class="form-text text-muted">One option per line</small>
                 </div>
+                
+                <div class="form-group mb-3">
+                    <h6 class="mb-2"><i class="fas fa-robot me-1"></i>AI Conditional Logic</h6>
+                    <div class="form-check mb-2">
+                        <input type="checkbox" class="form-check-input" id="edit-ai-decides-${index}" ${step.conditionalLogic?.ai_decides ? 'checked' : ''} />
+                        <label class="form-check-label" for="edit-ai-decides-${index}">Enable AI-controlled conditional logic</label>
+                        <small class="form-text text-muted d-block">When enabled, AI will decide whether to show this step based on previous answers</small>
+                    </div>
                     
+                    <div id="ai-logic-group-${index}" style="${step.conditionalLogic?.ai_decides ? '' : 'display: none;'}">
+                        <label for="edit-decision-prompt-${index}" class="form-label">Decision Prompt</label>
+                        <textarea class="form-control" id="edit-decision-prompt-${index}" rows="3" placeholder="Describe when this field should be shown...">${step.conditionalLogic?.decision_prompt || ''}</textarea>
+                        <small class="form-text text-muted">Instructions for the AI on when to show this field. Be specific about the conditions.</small>
+                    </div>
+                </div>
                 
                 <div class="form-group">
                     <button type="button" class="btn btn-primary" onclick="saveFormStepEdit(${index})">Save Changes</button>
@@ -546,6 +790,16 @@ $createdByName = isset($createdByName) ? $createdByName : '';
                     $(`#options-group-${index}`).show();
                 } else {
                     $(`#options-group-${index}`).hide();
+                }
+            });
+            
+            // Handle AI logic checkbox to show/hide decision prompt
+            $(`#edit-ai-decides-${index}`).on('change', function () {
+                const isChecked = $(this).is(':checked');
+                if (isChecked) {
+                    $(`#ai-logic-group-${index}`).show();
+                } else {
+                    $(`#ai-logic-group-${index}`).hide();
                 }
             });
         };
@@ -582,6 +836,24 @@ $createdByName = isset($createdByName) ? $createdByName : '';
             } else {
                 delete step.options;
             }
+            
+            // Handle AI conditional logic
+            const aiDecides = $(`#edit-ai-decides-${index}`).is(':checked');
+            if (aiDecides) {
+                const decisionPrompt = $(`#edit-decision-prompt-${index}`).val().trim();
+                if (decisionPrompt) {
+                    step.conditionalLogic = {
+                        ai_decides: true,
+                        decision_prompt: decisionPrompt
+                    };
+                } else {
+                    // If checkbox is checked but no prompt provided, remove conditional logic
+                    delete step.conditionalLogic;
+                }
+            } else {
+                // If checkbox is unchecked, remove conditional logic
+                delete step.conditionalLogic;
+            }
 
             // Restore original card body and update display
             const targetElement = $(`.card[data-step-index="${index}"]`);
@@ -590,6 +862,9 @@ $createdByName = isset($createdByName) ? $createdByName : '';
             // Update JSON and re-render to show updated content
             saveFormStepsToJson();
             renderFormSteps();
+            
+            // Mark as having unsaved changes
+            markUnsavedChanges();
         };
 
         // Cancel form step edit
@@ -709,6 +984,73 @@ $createdByName = isset($createdByName) ? $createdByName : '';
             console.log('Initializing form steps editor...');
             loadFormStepsFromJson();
             console.log('Form steps loaded:', window.formSteps);
+            
+            // Handle form submission to clear unsaved changes flag
+            $('form').on('submit', function() {
+                markChangesSaved();
+            });
+            
+            // Warn user about unsaved changes when leaving page
+            $(window).on('beforeunload', function() {
+                if (window.hasUnsavedChanges) {
+                    return 'You have unsaved changes to your form. Are you sure you want to leave?';
+                }
+            });
+            
+            // Also warn when navigating away via links
+            $('a').on('click', function(e) {
+                if (window.hasUnsavedChanges && !$(this).attr('href').startsWith('#')) {
+                    if (!confirm('You have unsaved changes. Are you sure you want to leave this page?')) {
+                        e.preventDefault();
+                        return false;
+                    }
+                }
+            });
         });
     });
 </script>
+
+<style>
+/* Drag and Drop Styles */
+.form-step-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-step-card.dragging {
+    opacity: 0.8;
+    transform: scale(1.02);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+.form-step-card.drag-over {
+    border: 2px dashed #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.drag-handle {
+    color: #6c757d;
+    transition: color 0.2s ease;
+}
+
+.drag-handle:hover {
+    color: #007bff;
+}
+
+.form-step-card:hover .drag-handle {
+    color: #495057;
+}
+
+/* Visual feedback during drag */
+#form-steps-container {
+    min-height: 100px;
+}
+
+.form-step-card[draggable="true"] {
+    cursor: grab;
+}
+
+.form-step-card[draggable="true"]:active {
+    cursor: grabbing;
+}
+</style>
